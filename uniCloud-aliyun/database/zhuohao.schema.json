@@ -1,0 +1,56 @@
+// 文档教程: https://uniapp.dcloud.net.cn/uniCloud/schema
+{
+	"bsonType": "object",
+	"required": [
+		"table_no",
+		"qrcode_file_id",
+		"qrcode_url",
+		"create_time"
+	],
+	"permission": {
+		"read": true,
+		"create": false,
+		"update": false,
+		"delete": false
+	},
+	"properties": {
+		"_id": {
+			"description": "ID，系统自动生成"
+		},
+		"table_no": {
+			"bsonType": "string",
+			"description": "桌号（支持数字或字母）",
+			"title": "桌号"
+		},
+		"scene": {
+			"bsonType": "string",
+			"description": "微信扫码参数 scene，用于页面还原桌号",
+			"title": "scene"
+		},
+		"page": {
+			"bsonType": "string",
+			"description": "小程序码跳转页面",
+			"title": "page",
+			"defaultValue": "pages/index/index"
+		},
+		"qrcode_file_id": {
+			"bsonType": "string",
+			"description": "二维码在云存储中的 fileID",
+			"title": "二维码 fileID"
+		},
+		"qrcode_url": {
+			"bsonType": "string",
+			"description": "二维码临时访问链接，便于管理台查看",
+			"title": "二维码链接"
+		},
+		"create_time": {
+			"bsonType": "timestamp",
+			"description": "记录创建时间",
+			"title": "创建时间",
+			"readOnly": true,
+			"forceDefaultValue": {
+				"$env": "now"
+			}
+		}
+	}
+}
