@@ -31,12 +31,12 @@
 .header__con {
   display: flex;
   justify-content: space-between;
-  background-color: white;
+  background-color: #fff;
   width: 90%;
   margin: -150rpx auto 0 auto;
   border-radius: 14rpx;
-  padding: 20rpx 30rpx 30rpx 30rpx;
-  box-shadow: 2px 0px 8px 0px rgba(243, 244, 246, 0.95);
+  padding: 20rpx 30rpx 30rpx;
+  box-shadow: 2px 0 8px rgba(243, 244, 246, 0.95);
 }
 .header__avatar {
   margin-top: -50rpx;
@@ -46,21 +46,25 @@
   font-size: 34rpx;
 }
 .header__line {
-  margin: 15rpx 0 10rpx 0;
+  margin: 15rpx 0 10rpx;
 }
-.header__linevipdesc {
+.header__vip {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.header__vip-desc {
   font-size: 24rpx;
   color: #909399;
-  margin-left: 20rpx;
 }
 .content {
   font-weight: bold;
   font-size: 30rpx;
-  margin: 100rpx 30rpx 30rpx 30rpx;
+  margin: 100rpx 30rpx 30rpx;
 }
 .grid-box {
   margin: 0 30rpx;
-  box-shadow: 2px 0px 8px 0px rgba(243, 244, 246, 0.95);
+  box-shadow: 2px 0 8px rgba(243, 244, 246, 0.95);
   border-radius: 14rpx;
 }
 .grid-box__text {

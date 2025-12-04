@@ -54,7 +54,7 @@
 					address: '私房菜（万达广场店）',
 					status: '已完成',
 					menu: [{
-						icon: '/static/menu/menulist/gbyd.png',
+						icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/menulist/gbyd.png',
 						name: '干煸芸豆',
 						desc: '芸豆+麻椒+老干妈+芝麻+辣椒',
 						price: 16,
@@ -67,19 +67,19 @@
 					address: '北京市朝阳区万豪公馆...',
 					status: '已取消',
 					menu: [{
-						icon: '/static/menu/menulist/tclj.png',
+						icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/menulist/tclj.png',
 						name: '糖醋里脊',
 						desc: '猪肉+醋+糖',
 						price: 28,
 						num: 1
 					}, {
-						icon: '/static/menu/menulist/xhscjd.png',
+						icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/menulist/xhscjd.png',
 						name: '西红柿炒鸡蛋',
 						desc: '西红柿+高筋面粉+鸡蛋+淀粉',
 						price: 14,
 						num: 1
 					}, {
-						icon: '/static/menu/menulist/mf.png',
+						icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/menulist/mf.png',
 						name: '米饭',
 						desc: '五常大米+水',
 						price: 2.5,

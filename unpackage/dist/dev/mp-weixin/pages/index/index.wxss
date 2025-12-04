@@ -24,12 +24,84 @@
 /* 垂直间距 */
 /* 透明度 */
 /* 文章场景相关 */
+.index-search {
+  margin: 0 30rpx;
+  -webkit-transform: translateY(-40rpx);
+          transform: translateY(-40rpx);
+}
+.index-search__bar {
+  display: flex;
+  align-items: center;
+  background: #f6f7fb;
+  border-radius: 60rpx;
+  padding: 0 20rpx;
+  height: 70rpx;
+}
+.index-search__input {
+  flex: 1;
+  margin: 0 12rpx;
+  font-size: 26rpx;
+  border: none;
+  background: transparent;
+  outline: none;
+}
+.index-search__action {
+  font-size: 26rpx;
+  color: #ee2f37;
+}
+.index-recommend {
+  margin: 20rpx 30rpx;
+  padding: 20rpx;
+  background: #fff7f5;
+  border-radius: 20rpx;
+}
+.index-recommend__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10rpx;
+}
+.index-recommend__title {
+  font-size: 30rpx;
+  font-weight: bold;
+}
+.index-recommend__more {
+  font-size: 24rpx;
+  color: #ee2f37;
+}
+.index-recommend scroll-view {
+  white-space: nowrap;
+}
+.index-recommend__item {
+  display: inline-flex;
+  flex-direction: column;
+  width: 220rpx;
+  margin-right: 20rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 20rpx;
+}
+.index-recommend__item image {
+  width: 180rpx;
+  height: 150rpx;
+  border-radius: 12rpx;
+  margin-bottom: 10rpx;
+}
+.index-recommend__name {
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.index-recommend__price {
+  color: #ee2f37;
+  font-weight: bold;
+  margin-top: 6rpx;
+}
 .body {
   position: relative;
   z-index: 1;
   margin: -40rpx 30rpx 0 30rpx;
   padding: 0 15rpx;
-  background-color: white;
+  background-color: #fff;
   border-radius: 14rpx;
 }
 .body__text {

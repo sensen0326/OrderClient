@@ -1,0 +1,34 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# HBuilderX / uni-app 构建产物
+unpackage/
+dist/
+*.wgt
+
+# IDE / 编辑器
+.idea/
+.vscode/
+*.iml
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+*.swp
+
+# 微信/小程序相关本地配置（如有）
+project.private.config.json
+.project.config.json.swp

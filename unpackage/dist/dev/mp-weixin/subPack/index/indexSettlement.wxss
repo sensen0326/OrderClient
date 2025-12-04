@@ -24,28 +24,91 @@
 /* 垂直间距 */
 /* 透明度 */
 /* 文章场景相关 */
-.wrap .address {
+.wrap {
+  padding-bottom: 160rpx;
+}
+.card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx;
+  margin: 30rpx;
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 30rpx rgba(0, 0, 0, 0.05);
+  background-color: #fff;
+}
+.address-card .card-desc {
+  margin-top: 10rpx;
+  color: #666;
+  font-size: 26rpx;
+}
+.table-card .card-desc {
+  color: #666;
+  font-size: 26rpx;
+}
+.distance {
+  color: #909399;
+  font-size: 22rpx;
+}
+.card-title {
+  font-size: 30rpx;
+  font-weight: bold;
+}
+.card-placeholder {
+  color: #909399;
+  font-size: 26rpx;
+  flex: 1;
+}
+.section-header {
   padding: 30rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-weight: bold;
 }
-.wrap .u-cell-box {
-  border-radius: 30rpx;
-  margin: 30rpx 0;
+.list-box {
+  padding: 20rpx 30rpx;
+  margin: 0 30rpx 20rpx 30rpx;
+  border-radius: 14rpx;
+  box-shadow: 2px 0 8px 0 rgba(243, 244, 246, 0.95);
+  background-color: #fff;
 }
-.wrap .item-menu-image {
+.item-menu-image {
   width: 100rpx;
   height: 100rpx;
   border-radius: 20rpx;
 }
-.wrap .item-menu-name {
+.item-menu-name {
   display: flex;
   flex-direction: column;
   margin-left: 20rpx;
   width: 100%;
 }
-.wrap .u-bottom {
+.u-cell-box {
+  border-radius: 30rpx;
+  margin: 30rpx;
+  background-color: #fff;
+}
+.fee-card {
+  margin: 0 30rpx;
+  padding: 30rpx;
+  border-radius: 24rpx;
+  background-color: #fff;
+  box-shadow: 0 8rpx 30rpx rgba(0, 0, 0, 0.03);
+}
+.fee-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 26rpx;
+  margin-bottom: 18rpx;
+  color: #606266;
+}
+.fee-row.total {
+  font-weight: bold;
+  font-size: 30rpx;
+  color: #303133;
+}
+.u-bottom {
   position: fixed;
   bottom: 0;
   width: 100%;
@@ -54,18 +117,19 @@
   display: flex;
   z-index: 99;
 }
-.wrap .u-bottom__nums {
+.u-bottom__nums {
   border-left: 1px solid #606266;
   font-size: 24rpx;
   margin-left: 20rpx;
   padding-left: 20rpx;
   font-weight: bold;
 }
-.wrap .u-bottom__wrap, .wrap .u-bottom__place {
+.u-bottom__wrap,
+.u-bottom__place {
   display: flex;
   color: #fff;
 }
-.wrap .u-bottom__wrap {
+.u-bottom__wrap {
   width: 70%;
   padding: 30rpx 0 30rpx 30rpx;
   align-items: center;
@@ -73,7 +137,7 @@
   border-top: 1px solid #f3f4f6;
   background-color: white;
 }
-.wrap .u-bottom__place {
+.u-bottom__place {
   background-color: #EE2F37;
   width: 30%;
   text-align: center;
@@ -82,10 +146,78 @@
   font-size: 32rpx;
   font-weight: bold;
 }
-.wrap .list-box {
-  padding: 20rpx 30rpx;
-  margin: 0 30rpx 20rpx 30rpx;
+.popup-inner {
+  padding: 40rpx;
+}
+.popup-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  margin: 40rpx 0 20rpx 0;
+}
+.form-textarea {
+  width: 100%;
+  border-radius: 20rpx;
+  background-color: #f3f4f6;
+  padding: 20rpx;
+}
+.form-textarea__inner {
+  width: 100%;
+  min-height: 160rpx;
+  border: none;
+  background: transparent;
+  font-size: 26rpx;
+  color: #303133;
+}
+.form-input {
+  width: 100%;
+  height: 70rpx;
+  border-radius: 20rpx;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  padding: 0 20rpx;
+}
+.form-input__inner {
+  flex: 1;
+  font-size: 26rpx;
+  border: none;
+  background: transparent;
+}
+.address-popup {
+  padding: 40rpx;
+}
+.address-popup__title {
+  font-size: 32rpx;
+  font-weight: bold;
   margin-bottom: 20rpx;
-  border-radius: 14rpx;
-  box-shadow: 2px 0px 8px 0px rgba(243, 244, 246, 0.95);
+}
+.address-item {
+  padding: 20rpx 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.address-item__title {
+  display: flex;
+  align-items: center;
+  font-size: 28rpx;
+}
+.address-item__title .tag {
+  background-color: #fef2f2;
+  color: #EE2F37;
+  font-size: 22rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  margin-left: 12rpx;
+}
+.address-item__desc {
+  color: #666;
+  font-size: 26rpx;
+  margin-top: 8rpx;
+}
+.invoice-popup {
+  padding: 40rpx;
+}
+.invoice-popup__title {
+  font-size: 32rpx;
+  font-weight: bold;
+  margin-bottom: 20rpx;
 }

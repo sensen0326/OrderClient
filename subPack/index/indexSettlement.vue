@@ -1,49 +1,43 @@
 <template>
 	<view class="wrap">
-		<!-- top start -->
-		<!-- @subCurrent if true 外卖 else 堂食-->
-		<view v-if="subCurrent == 1">
-			<!-- address start-->
-			<view class="address">
-				<view>
-					<view class="u-font-weight">北京市朝阳区万豪公馆7号楼1单元1201</view>
-					<view class="u-font-24 u-type-info u-m-t-15">
-						<text class="u-m-r-10">Kaiyuan_Q</text>
-						<text>188****8888</text>
-					</view>
+		<!-- channel info -->
+		<view v-if="cartChannel === 'takeout'" class="card address-card" @click="openAddressPopup">
+			<view class="card-main" v-if="selectedAddress">
+				<view class="card-title">
+					<text class="strong">{{selectedAddress.receiver}}</text>
+					<text class="tel">{{selectedAddress.mobile}}</text>
 				</view>
-				<view>
-					<u-icon name="arrow-right" color="#909399"></u-icon>
-				</view>
+				<view class="card-desc">{{selectedAddress.detail}}</view>
 			</view>
-
-			<!-- slot -->
-			<u-gap height="20" bg-color="#f3f4f6"></u-gap>
+			<view v-else class="card-placeholder">
+				请选择送餐地址
+			</view>
+			<u-icon name="arrow-right" color="#909399"></u-icon>
 		</view>
-		<!-- top end -->
+		<view v-else class="card table-card">
+			<view class="card-title">{{restaurantName}}</view>
+			<view class="card-desc">
+				<text>桌号：{{displayTableNo}}</text>
+				<text v-if="tableInfo && tableInfo.distance" class="distance"> · 距离您 {{tableInfo.distance}}</text>
+			</view>
+		</view>
 
-		<!-- list start -->
-		<view class="u-flex u-row-between u-m-t-30 u-m-b-30 u-m-l-30 u-m-r-30">
-			<view class="u-font-24 u-font-weight u-content-color">
-				私房菜（万达广场店）
-			</view>
-			<view>
-				<u-tag :text="subCurrent == 1 ? '外卖' : '堂食'" mode="dark" bg-color="#EE2F37" size="mini" />
-			</view>
+		<!-- order list -->
+		<view class="section-header">
+			<text>{{restaurantName || '私房菜'}}</text>
+			<u-tag :text="cartChannel === 'takeout' ? '外卖' : '堂食'" mode="dark" bg-color="#EE2F37" size="mini" />
 		</view>
 		<view v-for="(item,index) in orderList" :key="index" class="u-flex list-box">
-			<view>
-				<image class="item-menu-image" :src="item.icon" mode="aspectFill"></image>
-			</view>
+			<image class="item-menu-image" :src="item.icon || item.dishImg" mode="aspectFill"></image>
 			<view class="item-menu-name">
 				<text class="u-font-26">{{item.name}}</text>
 				<view class="u-line-2 u-font-20 u-type-info u-m-t-10 u-m-b-10">
-					{{item.desc}}
+					{{item.skuName}}<text v-if="item.optionsText"> · {{item.optionsText}}</text>
 				</view>
 				<view class="u-flex u-row-between">
 					<view class="u-font-weight u-font-24" style="color: #EE2F37;">
 						<text class="u-font-20">￥</text>
-						{{item.price}}
+						{{Number(item.price).toFixed(2)}}
 					</view>
 					<view class="u-type-info u-font-22">
 						x{{item.value}}
@@ -51,91 +45,225 @@
 				</view>
 			</view>
 		</view>
-		<!-- list end -->
 
-		<!-- cell start -->
+		<!-- detail cells -->
 		<view class="u-cell-box">
 			<u-cell-group :border="false">
-				<u-cell-item title="用餐人数" :value="form.people ? form.people+'人' : '请选择'" :title-style="titleStyle"
-					:value-style="valueStyle" hover-class="none" @click="PopupModal(0)" :border-bottom="false"
-					v-if="subCurrent == 0"></u-cell-item>
-				<u-cell-item title="配送时间" :value="form.mealsTime ? form.mealsTime : '请选择'" :title-style="titleStyle"
-					:value-style="valueStyle" hover-class="none" @click="TimerShow = true" :border-bottom="false"
-					v-else></u-cell-item>
-				<u-cell-item title="留言" :border-bottom="false" :title-style="titleStyle"
+				<u-cell-item
+					v-if="cartChannel === 'dine_in'"
+					title="用餐人数"
+					:value="form.people ? form.people + '人' : '请选择'"
+					:title-style="titleStyle"
+					:value-style="valueStyle"
+					hover-class="none"
+					@click="PopupModal(0)"
+					:border-bottom="false"
+				></u-cell-item>
+				<u-cell-item
+					v-else
+					title="送达时间"
+					:value="form.mealsTime ? form.mealsTime : '尽快送达'"
+					:title-style="titleStyle"
+					:value-style="valueStyle"
+					hover-class="none"
+					@click="TimerShow = true"
+					:border-bottom="false"
+				></u-cell-item>
+				<u-cell-item
+					title="餐具份数"
+					:value="utensilsCountText"
+					:title-style="titleStyle"
+					:value-style="valueStyle"
+					hover-class="none"
+					@click="changeUtensils"
+				></u-cell-item>
+				<u-cell-item
+					title="备注"
 					:value="form.leave ? (form.leave.length > 10 ? form.leave.slice(0, 10) + '...' : form.leave) : '无'"
-					:value-style="valueStyle" hover-class="none" @click="PopupModal(1)"></u-cell-item>
+					:title-style="titleStyle"
+					:value-style="valueStyle"
+					hover-class="none"
+					@click="PopupModal(1)"
+				></u-cell-item>
+				<u-cell-item
+					title="优惠"
+					:value="couponText"
+					:title-style="titleStyle"
+					:value-style="valueStyle"
+					hover-class="none"
+					@click="couponSheetShow = true"
+				></u-cell-item>
+				<u-cell-item
+					title="发票"
+					:value="invoiceText"
+					:title-style="titleStyle"
+					:value-style="valueStyle"
+					hover-class="none"
+					@click="openInvoicePopup"
+				></u-cell-item>
 			</u-cell-group>
 		</view>
-		<!-- cell end -->
 
-		<!-- slot -->
+		<!-- fee breakdown -->
+		<view class="fee-card">
+			<view class="fee-row">
+				<text>商品小计</text>
+				<text>￥{{feeDetail.goodsTotal.toFixed(2)}}</text>
+			</view>
+			<view class="fee-row">
+				<text>包装费</text>
+				<text>￥{{feeDetail.packageFee.toFixed(2)}}</text>
+			</view>
+			<view class="fee-row" v-if="cartChannel === 'takeout'">
+				<text>配送费</text>
+				<text>￥{{feeDetail.deliveryFee.toFixed(2)}}</text>
+			</view>
+			<view class="fee-row" v-if="feeDetail.discount > 0">
+				<text>优惠减免</text>
+				<text>-￥{{feeDetail.discount.toFixed(2)}}</text>
+			</view>
+			<view class="fee-row total">
+				<text>应付金额</text>
+				<text>￥{{feeDetail.payable.toFixed(2)}}</text>
+			</view>
+		</view>
+
 		<u-gap height="100"></u-gap>
 
-		<!-- button start -->
+		<!-- bottom -->
 		<view class="u-bottom">
 			<view class="u-bottom__wrap">
 				<view class="u-font-weight u-font-40 u-m-l-20">
 					<text class="u-font-24">￥</text>
-					{{orderPrice.toFixed(2)}}
+					{{feeDetail.payable.toFixed(2)}}
 				</view>
-				<view class="u-bottom__nums">共 {{orderNum}} 件商品</view>
+				<view class="u-bottom__nums">共{{orderNum}} 件商品</view>
 			</view>
 			<view class="u-bottom__place" @click="confirmPay">
 				确认支付
 			</view>
 		</view>
-		<!-- button end -->
 
-		<!-- popup start -->
+		<!-- people/remark popup -->
 		<u-popup v-model="PopupShow" mode="bottom" height="80%" border-radius="14" closeable :mask-close-able="false">
 			<view v-if="!PopupPage">
-				<view class="u-m-l-30 u-m-r-30 u-m-t-30">
-					<view>
-						<u-image src="/static/menu/index-dining.png" width="220" height="180"></u-image>
-					</view>
-					<view class="u-font-34 u-font-weight u-m-t-50 u-m-b-50">请选择用餐人数</view>
-					<!-- content -->
+				<view class="popup-inner">
+					<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/index-dining.png" width="220" height="180"></u-image>
+					<view class="popup-title">请选择用餐人数</view>
 					<u-grid :col="4" :border="false" hover-class="none">
-						<u-grid-item v-for="item in 12" :key="item" :custom-style="customStyle"
-							@click="SelectPeople(item)">
-							<view class="u-font-weight">
-								<!-- #ifdef MP-WEIXIN -->
-								{{item+1}}
-								<!-- #endif -->
-								<!-- #ifdef H5 -->
-								{{item}}
-								<!-- #endif -->
-							</view>
-						</u-grid-item>
-					</u-grid>
-					<u-gap height="30"></u-gap>
-				</view>
-			</view>
-			<!-- leave -->
-			<view v-else>
-				<view class="u-m-l-30 u-m-r-30 u-m-t-30">
-					<view>
-						<u-image src="/static/menu/index-leave.jpg" width="220" height="180"></u-image>
-					</view>
-					<view class="u-font-34 u-font-weight u-m-t-50 u-m-b-50">快捷标签</view>
-					<!-- tags -->
-					<u-grid :col="4" :border="false" hover-class="none">
-						<u-grid-item v-for="item in tags" :key="item" :custom-style="customStyle"
-							@click="SelectTags(item)">
+						<u-grid-item v-for="item in 12" :key="item" :custom-style="customStyle" @click="SelectPeople(item)">
 							<view class="u-font-weight">{{item}}</view>
 						</u-grid-item>
 					</u-grid>
-					<view class="u-font-34 u-font-weight u-m-t-50 u-m-b-50">自定义留言</view>
-					<u-input type="textarea" placeholder="请填写您的需求" placeholder-style="color: #909399"
-						:custom-style="inputStyle" v-model="form.leave"></u-input>
-					<u-gap height="30"></u-gap>
+				</view>
+			</view>
+			<view v-else>
+				<view class="popup-inner">
+					<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/index-leave.jpg" width="220" height="180"></u-image>
+					<view class="popup-title">快捷标签</view>
+					<u-grid :col="4" :border="false" hover-class="none">
+						<u-grid-item v-for="item in tags" :key="item" :custom-style="customStyle" @click="SelectTags(item)">
+							<view class="u-font-weight">{{item}}</view>
+						</u-grid-item>
+					</u-grid>
+					<view class="popup-title">自定义留言</view>
+					<view class="form-textarea" :style="inputStyle">
+						<textarea
+							class="form-textarea__inner"
+							placeholder="请输入您的需求"
+							placeholder-style="color: #909399"
+							:value="form.leave"
+							auto-height
+							@input="handleLeaveInput"
+						></textarea>
+					</view>
 				</view>
 			</view>
 		</u-popup>
-		<!-- popup end -->
 
-		<!-- timerSelect -->
+		<!-- address popup -->
+		<u-popup v-model="addressPopup" mode="bottom" height="80%" border-radius="20">
+			<view class="address-popup">
+				<view class="address-popup__title">选择收货地址</view>
+				<u-radio-group v-model="selectedAddressId">
+					<u-radio
+						v-for="item in addressList"
+						:key="item.id"
+						:name="item.id"
+						@change="noop"
+						active-color="#EE2F37"
+					>
+						<view class="address-item">
+							<view class="address-item__title">
+								<text class="strong">{{item.receiver}}</text>
+								<text class="tel">{{item.mobile}}</text>
+								<text class="tag" v-if="item.tag">{{item.tag}}</text>
+							</view>
+							<view class="address-item__desc">{{item.detail}}</view>
+						</view>
+					</u-radio>
+				</u-radio-group>
+				<view v-if="addressFormVisible" class="address-form">
+					<view class="form-input u-m-b-20">
+						<input
+							class="form-input__inner"
+							:value="addressForm.receiver"
+							placeholder="收货人"
+							@input="handleAddressInput('receiver', $event)"
+						/>
+					</view>
+					<view class="form-input u-m-b-20">
+						<input
+							class="form-input__inner"
+							type="number"
+							:value="addressForm.mobile"
+							placeholder="手机号"
+							@input="handleAddressInput('mobile', $event)"
+						/>
+					</view>
+					<view class="form-input">
+						<input
+							class="form-input__inner"
+							:value="addressForm.detail"
+							placeholder="详细地址"
+							@input="handleAddressInput('detail', $event)"
+						/>
+					</view>
+					<u-button type="primary" class="u-m-t-20" @click="saveAddress">保存地址</u-button>
+				</view>
+				<u-button v-else type="primary" plain class="u-m-t-30" @click="startAddAddress">新增地址</u-button>
+				<u-button type="primary" class="u-m-t-20" @click="closeAddressPopup">完成</u-button>
+			</view>
+		</u-popup>
+
+		<!-- invoice popup -->
+		<u-popup v-model="invoicePopup" mode="bottom" height="60%" border-radius="20">
+			<view class="invoice-popup">
+				<view class="invoice-popup__title">填写发票抬头</view>
+				<u-checkbox :value="invoiceInfo.needInvoice" active-color="#EE2F37" @change="handleInvoiceCheck">需要电子发票</u-checkbox>
+				<view v-if="invoiceInfo.needInvoice" class="u-m-t-20">
+					<view class="form-input u-m-b-20">
+						<input
+							class="form-input__inner"
+							:value="invoiceInfo.title"
+							placeholder="发票抬头"
+							@input="handleInvoiceInput('title', $event)"
+						/>
+					</view>
+					<view class="form-input">
+						<input
+							class="form-input__inner"
+							:value="invoiceInfo.taxNo"
+							placeholder="税号(选填)"
+							@input="handleInvoiceInput('taxNo', $event)"
+						/>
+					</view>
+				</view>
+				<u-button type="primary" class="u-m-t-30" @click="saveInvoice">保存</u-button>
+			</view>
+		</u-popup>
+
+		<u-action-sheet :list="couponActions" v-model="couponSheetShow" @click="handleSelectCoupon"></u-action-sheet>
 		<u-picker v-model="TimerShow" mode="time" :params="TimerParams" @confirm="mealsPicker"></u-picker>
 	</view>
 </template>
@@ -144,20 +272,55 @@
 	export default {
 		data() {
 			return {
-				// 堂食or外卖
 				subCurrent: 0,
+				cartChannel: 'dine_in',
+				sessionId: '',
+				restaurantName: '',
+				tableInfo: null,
 				form: {
 					mealsTime: '',
 					people: 0,
 					leave: ''
 				},
-				// orderlist
 				orderList: [],
-				// orderTotalPrice
 				orderPrice: 0,
-				// orderNum
 				orderNum: 0,
-				// u-cell
+				addressList: [],
+				selectedAddressId: '',
+				addressPopup: false,
+				addressFormVisible: false,
+				addressForm: {
+					receiver: '',
+					mobile: '',
+					detail: ''
+				},
+				couponSheetShow: false,
+				couponList: [{
+					id: 'coupon_5',
+					title: '满50减5',
+					amount: 5,
+					threshold: 50
+				}, {
+					id: 'coupon_10',
+					title: '满99减10',
+					amount: 10,
+					threshold: 99
+				}],
+				selectedCouponId: '',
+				invoicePopup: false,
+				invoiceInfo: {
+					needInvoice: false,
+					title: '',
+					taxNo: ''
+				},
+				utensilsCount: 0,
+				feeDetail: {
+					goodsTotal: 0,
+					packageFee: 0,
+					deliveryFee: 0,
+					discount: 0,
+					payable: 0
+				},
 				valueStyle: {
 					fontSize: '26rpx'
 				},
@@ -166,10 +329,8 @@
 					color: '#333',
 					fontSize: '26rpx'
 				},
-				// popup
 				PopupShow: false,
 				PopupPage: false,
-				// timerSelect
 				TimerShow: false,
 				TimerParams: {
 					year: false,
@@ -179,86 +340,255 @@
 					minute: true,
 					second: false
 				},
-				// u-cell
 				customStyle: {
-					border: "20rpx solid #fff",
-					borderRadius: "50rpx",
+					border: '20rpx solid #fff',
+					borderRadius: '50rpx',
 					padding: '40rpx 0',
 					backgroundColor: '#f4f4f5'
 				},
-				// label
-				tags: ['不放辣', '少放辣', '多放辣', '少盐', '不吃蒜', '不吃香菜', '不吃葱', '少油'],
-				// input
+				tags: ['不要葱', '少放辣', '多放辣', '少盐', '不要香菜', '不要花生', '少油', '多餐具'],
 				inputStyle: {
 					backgroundColor: '#f3f4f6',
-					borderRadius: "20rpx",
-					padding: "30rpx"
+					borderRadius: '20rpx',
+					padding: '30rpx'
 				}
 			}
 		},
+		computed: {
+			selectedAddress() {
+				return this.addressList.find(item => item.id === this.selectedAddressId)
+			},
+			displayTableNo() {
+				return this.tableInfo && this.tableInfo.tableNo ? this.tableInfo.tableNo : '未绑定'
+			},
+			couponText() {
+				const coupon = this.activeCoupon
+				if (!coupon) {
+					return '未使用'
+				}
+				return `${coupon.title} -¥${coupon.amount}`
+			},
+			invoiceText() {
+				if (!this.invoiceInfo.needInvoice) {
+					return '无需发票'
+				}
+				return this.invoiceInfo.title || '点击填写抬头'
+			},
+			utensilsCountText() {
+				if (!this.utensilsCount) {
+					return '无需餐具'
+				}
+				return `${this.utensilsCount} 份`
+			},
+			couponActions() {
+				return this.couponList.map(item => ({
+					text: `${item.title}（-${item.amount}元）`,
+					value: item.id
+				})).concat([{
+					text: '不使用优惠',
+					value: ''
+				}])
+			},
+			activeCoupon() {
+				return this.couponList.find(item => item.id === this.selectedCouponId) || null
+			}
+		},
+		watch: {
+			orderList: {
+				handler() {
+					this.calcFeeDetail()
+				},
+				deep: true
+			},
+			selectedCouponId() {
+				this.calcFeeDetail()
+			},
+			cartChannel() {
+				this.calcFeeDetail()
+			}
+		},
 		onLoad(param) {
-			// determine 外卖 or 堂食
-			this.subCurrent = param.subCurrent;
-			// obtainStorageMenu
+			this.subCurrent = Number(param.subCurrent || 0)
+			this.cartChannel = this.subCurrent === 1 ? 'takeout' : 'dine_in'
+			const profile = uni.getStorageSync('checkoutProfile') || {}
+			const addressStorage = uni.getStorageSync('userAddressList')
+			if (addressStorage && Array.isArray(addressStorage)) {
+				this.addressList = addressStorage
+			} else {
+				this.addressList = [{
+					id: 'addr_default',
+					receiver: 'Kaiyuan_Q',
+					mobile: '188****8888',
+					detail: '北京市朝阳区万达广场4层·私房菜',
+					tag: '默认'
+				}]
+			}
+			this.selectedAddressId = profile.selectedAddressId || (this.addressList[0] && this.addressList[0].id) || ''
+			if (profile.channel === this.cartChannel) {
+				this.form.people = profile.lastPeople || 0
+				this.form.mealsTime = profile.lastMealsTime || ''
+				this.form.leave = profile.lastLeave || ''
+				this.invoiceInfo = profile.invoice || this.invoiceInfo
+				this.utensilsCount = profile.utensilsCount || 0
+			}
 			uni.getStorage({
 				key: 'dishData',
-				success: (res) => {
-					this.orderList = res.data.order;
-					this.orderNum = res.data.menuNum;
-					this.orderPrice = res.data.menuPrice;
+				success: res => {
+					this.orderList = res.data.order || []
+					this.orderNum = res.data.menuNum || 0
+					this.orderPrice = res.data.menuPrice || 0
+					this.cartChannel = res.data.channel || this.cartChannel
+					this.subCurrent = this.cartChannel === 'takeout' ? 1 : 0
+					this.sessionId = res.data.sessionId || ''
+					this.tableInfo = res.data.tableInfo || null
+					this.restaurantName = res.data.restaurantName || '私房菜'
+					this.calcFeeDetail()
 				}
-			});
+			})
 		},
 		methods: {
-			PopupModal(param) {
-				if (param) {
-					this.PopupPage = true;
-				} else {
-					this.PopupPage = false;
-				}
-				this.PopupShow = true;
+			noop() {},
+			handleLeaveInput(e) {
+				this.form.leave = e && e.detail ? e.detail.value : ''
 			},
-			// leave
-			SelectTags(param) {
-				if (this.form.leave === '') {
-					this.form.leave = param;
-					return;
-				}
-				this.form.leave = this.form.leave + '，' + param;
+			handleAddressInput(field, e) {
+				const value = e && e.detail ? e.detail.value : ''
+				this.$set(this.addressForm, field, value)
 			},
-			// NumberDiners
-			SelectPeople(param) {
-				// #ifdef H5
-				this.form.people = param;
-				// #endif
-				// #ifdef MP-WEIXIN
-				this.form.people = param + 1;
-				// #endif
-				this.PopupShow = false;
+			handleInvoiceInput(field, e) {
+				const value = e && e.detail ? e.detail.value : ''
+				this.$set(this.invoiceInfo, field, value)
 			},
-			// PickMealsTimer
-			mealsPicker(param) {
-				this.form.mealsTime = param.day + "日" + ' ' + param.hour + ":" + param.minute;
+			calcFeeDetail() {
+				const goodsTotal = this.orderList.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.value || 0), 0)
+				const packageFee = this.cartChannel === 'takeout' ? this.orderNum * 1 : 0
+				const deliveryFee = this.cartChannel === 'takeout' ? 5 : 0
+				let discount = 0
+				const coupon = this.activeCoupon
+				if (coupon && goodsTotal >= coupon.threshold) {
+					discount = coupon.amount
+				}
+				const payable = Math.max(goodsTotal + packageFee + deliveryFee - discount, 0)
+				this.feeDetail = {
+					goodsTotal,
+					packageFee,
+					deliveryFee,
+					discount,
+					payable
+				}
 			},
-			// confirmPay
-			confirmPay() {
-				// 堂食
-				if (this.subCurrent == 0) {
-					if (!this.form.people) {
-						this.$u.toast('请选择用餐人数')
-						return;
-					}
+			openAddressPopup() {
+				this.addressPopup = true
+				this.addressFormVisible = false
+			},
+			closeAddressPopup() {
+				this.addressPopup = false
+				this.persistAddresses()
+			},
+			startAddAddress() {
+				this.addressFormVisible = true
+				this.addressForm = {
+					receiver: '',
+					mobile: '',
+					detail: ''
 				}
-				// 外卖
-				if (this.subCurrent == 1) {
-					if (!this.form.mealsTime) {
-						this.$u.toast('请选择配送时间')
-						return;
-					}
+			},
+			saveAddress() {
+				if (!this.addressForm.receiver || !this.addressForm.mobile || !this.addressForm.detail) {
+					this.$u.toast('请完整填写地址信息')
+					return
 				}
-				uni.redirectTo({
-					url: '/subPack/index/indexPaysuccess'
+				const newAddress = {
+					id: `addr_${Date.now()}`,
+					receiver: this.addressForm.receiver,
+					mobile: this.addressForm.mobile,
+					detail: this.addressForm.detail,
+					tag: '新建'
+				}
+				this.addressList.push(newAddress)
+				this.selectedAddressId = newAddress.id
+				this.addressFormVisible = false
+				this.persistAddresses()
+			},
+			persistAddresses() {
+				uni.setStorage({
+					key: 'userAddressList',
+					data: this.addressList
 				})
+			},
+			handleSelectCoupon(index) {
+				const action = this.couponActions[index]
+				if (!action) return
+				this.selectedCouponId = action.value
+			},
+			changeUtensils() {
+				const items = ['无需餐具', '1 份', '2 份', '3 份', '4 份']
+				uni.showActionSheet({
+					itemList: items,
+					success: (res) => {
+						this.utensilsCount = res.tapIndex
+					}
+				})
+			},
+			openInvoicePopup() {
+				this.invoicePopup = true
+			},
+			handleInvoiceCheck(e) {
+				this.invoiceInfo.needInvoice = !!(e && e.value)
+			},
+			saveInvoice() {
+				if (this.invoiceInfo.needInvoice && !this.invoiceInfo.title) {
+					this.$u.toast('请输入发票抬头')
+					return
+				}
+				this.invoicePopup = false
+			},
+			PopupModal(param) {
+				this.PopupPage = Boolean(param)
+				this.PopupShow = true
+			},
+			SelectTags(param) {
+				if (!this.form.leave) {
+					this.form.leave = param
+					return
+				}
+				this.form.leave = `${this.form.leave}；${param}`
+			},
+			SelectPeople(param) {
+				this.form.people = param
+				this.PopupShow = false
+			},
+			mealsPicker(param) {
+				this.form.mealsTime = `${param.day} ${param.hour}:${param.minute}`
+			},
+			async confirmPay() {
+				if (this.cartChannel === 'dine_in' && !this.form.people) {
+					this.$u.toast('请选择用餐人数')
+					return
+				}
+				if (this.cartChannel === 'takeout' && !this.selectedAddressId) {
+					this.$u.toast('请选择送餐地址')
+					return
+				}
+				const profile = {
+					channel: this.cartChannel,
+					lastPeople: this.form.people,
+					lastMealsTime: this.form.mealsTime,
+					lastLeave: this.form.leave,
+					selectedAddressId: this.selectedAddressId,
+					invoice: this.invoiceInfo,
+					utensilsCount: this.utensilsCount
+				}
+				uni.setStorage({
+					key: 'checkoutProfile',
+					data: profile
+				})
+				this.$u.toast('已生成订单草稿，模拟支付成功')
+				setTimeout(() => {
+					uni.redirectTo({
+						url: '/subPack/index/indexPaysuccess'
+					})
+				}, 500)
 			}
 		}
 	}
@@ -266,80 +596,233 @@
 
 <style lang="scss">
 	.wrap {
-		.address {
-			padding: 30rpx;
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-		}
+		padding-bottom: 160rpx;
+	}
 
-		.u-cell-box {
-			border-radius: 30rpx;
-			margin: 30rpx 0;
-		}
+	.card {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 30rpx;
+		margin: 30rpx;
+		border-radius: 24rpx;
+		box-shadow: 0 8rpx 30rpx rgba(0, 0, 0, 0.05);
+		background-color: #fff;
+	}
 
-		.item-menu-image {
-			width: 100rpx;
-			height: 100rpx;
-			border-radius: 20rpx;
-		}
+	.address-card .card-desc {
+		margin-top: 10rpx;
+		color: #666;
+		font-size: 26rpx;
+	}
 
-		.item-menu-name {
-			display: flex;
-			flex-direction: column;
-			margin-left: 20rpx;
-			width: 100%;
-		}
+	.table-card .card-desc {
+		color: #666;
+		font-size: 26rpx;
+	}
 
-		.u-bottom {
-			position: fixed;
-			bottom: 0;
-			width: 100%;
-			left: 0;
-			right: 0;
-			display: flex;
-			z-index: 99;
+	.distance {
+		color: #909399;
+		font-size: 22rpx;
+	}
 
-			&__nums {
-				border-left: 1px solid #606266;
-				font-size: 24rpx;
-				margin-left: 20rpx;
-				padding-left: 20rpx;
-				font-weight: bold;
-			}
+	.card-title {
+		font-size: 30rpx;
+		font-weight: bold;
+	}
 
-			&__wrap,
-			&__place {
-				display: flex;
-				color: #fff;
-			}
+	.card-placeholder {
+		color: #909399;
+		font-size: 26rpx;
+		flex: 1;
+	}
 
-			&__wrap {
-				width: 70%;
-				padding: 30rpx 0 30rpx 30rpx;
-				align-items: center;
-				color: #303133;
-				border-top: 1px solid #f3f4f6;
-				background-color: white;
-			}
+	.section-header {
+		padding: 30rpx;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-weight: bold;
+	}
 
-			&__place {
-				background-color: #EE2F37;
-				width: 30%;
-				text-align: center;
-				flex-direction: column;
-				justify-content: center;
-				font-size: 32rpx;
-				font-weight: bold;
-			}
-		}
+	.list-box {
+		padding: 20rpx 30rpx;
+		margin: 0 30rpx 20rpx 30rpx;
+		border-radius: 14rpx;
+		box-shadow: 2px 0 8px 0 rgba(243, 244, 246, 0.95);
+		background-color: #fff;
+	}
 
-		.list-box {
-			padding: 20rpx 30rpx;
-			margin: 0 30rpx 20rpx 30rpx;
-			margin-bottom: 20rpx;
-			border-radius: 14rpx;
-			box-shadow: 2px 0px 8px 0px rgba(243, 244, 246, 0.95);
-		}
+	.item-menu-image {
+		width: 100rpx;
+		height: 100rpx;
+		border-radius: 20rpx;
+	}
+
+	.item-menu-name {
+		display: flex;
+		flex-direction: column;
+		margin-left: 20rpx;
+		width: 100%;
+	}
+
+	.u-cell-box {
+		border-radius: 30rpx;
+		margin: 30rpx;
+		background-color: #fff;
+	}
+
+	.fee-card {
+		margin: 0 30rpx;
+		padding: 30rpx;
+		border-radius: 24rpx;
+		background-color: #fff;
+		box-shadow: 0 8rpx 30rpx rgba(0, 0, 0, 0.03);
+	}
+
+	.fee-row {
+		display: flex;
+		justify-content: space-between;
+		font-size: 26rpx;
+		margin-bottom: 18rpx;
+		color: #606266;
+	}
+
+	.fee-row.total {
+		font-weight: bold;
+		font-size: 30rpx;
+		color: #303133;
+	}
+
+	.u-bottom {
+		position: fixed;
+		bottom: 0;
+		width: 100%;
+		left: 0;
+		right: 0;
+		display: flex;
+		z-index: 99;
+	}
+
+	.u-bottom__nums {
+		border-left: 1px solid #606266;
+		font-size: 24rpx;
+		margin-left: 20rpx;
+		padding-left: 20rpx;
+		font-weight: bold;
+	}
+
+	.u-bottom__wrap,
+	.u-bottom__place {
+		display: flex;
+		color: #fff;
+	}
+
+	.u-bottom__wrap {
+		width: 70%;
+		padding: 30rpx 0 30rpx 30rpx;
+		align-items: center;
+		color: #303133;
+		border-top: 1px solid #f3f4f6;
+		background-color: white;
+	}
+
+	.u-bottom__place {
+		background-color: #EE2F37;
+		width: 30%;
+		text-align: center;
+		flex-direction: column;
+		justify-content: center;
+		font-size: 32rpx;
+		font-weight: bold;
+	}
+
+	.popup-inner {
+		padding: 40rpx;
+	}
+
+	.popup-title {
+		font-size: 32rpx;
+		font-weight: bold;
+		margin: 40rpx 0 20rpx 0;
+	}
+
+	.form-textarea {
+		width: 100%;
+		border-radius: 20rpx;
+		background-color: #f3f4f6;
+		padding: 20rpx;
+	}
+
+	.form-textarea__inner {
+		width: 100%;
+		min-height: 160rpx;
+		border: none;
+		background: transparent;
+		font-size: 26rpx;
+		color: #303133;
+	}
+
+	.form-input {
+		width: 100%;
+		height: 70rpx;
+		border-radius: 20rpx;
+		background-color: #f3f4f6;
+		display: flex;
+		align-items: center;
+		padding: 0 20rpx;
+	}
+
+	.form-input__inner {
+		flex: 1;
+		font-size: 26rpx;
+		border: none;
+		background: transparent;
+	}
+
+	.address-popup {
+		padding: 40rpx;
+	}
+
+	.address-popup__title {
+		font-size: 32rpx;
+		font-weight: bold;
+		margin-bottom: 20rpx;
+	}
+
+	.address-item {
+		padding: 20rpx 0;
+		border-bottom: 1px solid #f0f0f0;
+	}
+
+	.address-item__title {
+		display: flex;
+		align-items: center;
+		font-size: 28rpx;
+	}
+
+	.address-item__title .tag {
+		background-color: #fef2f2;
+		color: #EE2F37;
+		font-size: 22rpx;
+		padding: 4rpx 12rpx;
+		border-radius: 8rpx;
+		margin-left: 12rpx;
+	}
+
+	.address-item__desc {
+		color: #666;
+		font-size: 26rpx;
+		margin-top: 8rpx;
+	}
+
+	.invoice-popup {
+		padding: 40rpx;
+	}
+
+	.invoice-popup__title {
+		font-size: 32rpx;
+		font-weight: bold;
+		margin-bottom: 20rpx;
 	}
 </style>
