@@ -16,6 +16,9 @@ dist/
 # IDE / 编辑器
 .idea/
 .vscode/
+.hbuilderx/
+.cursor/
+.history/
 *.iml
 
 # 系统文件
