@@ -9,9 +9,16 @@ yarn.lock
 pnpm-lock.yaml
 
 # HBuilderX / uni-app 构建产物
-unpackage/
 dist/
 *.wgt
+
+# 微信小程序编译输出（含 .sourcemap）
+unpackage/
+unpackage/dist/
+unpackage/dev/
+unpackage/cache/
+unpackage/resources/
+unpackage/**/*.log
 
 # IDE / 编辑器
 .idea/
@@ -24,6 +31,7 @@ dist/
 # 系统文件
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # 日志
 *.log
@@ -31,7 +39,12 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.swp
+*.swo
+*.bak
 
 # 微信/小程序相关本地配置（如有）
 project.private.config.json
+project.config.json
 .project.config.json.swp
+miniprogram_npm/
+typings/
