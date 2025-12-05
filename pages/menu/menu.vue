@@ -177,6 +177,7 @@
 						</view>
 					</view>
 				</view>
+				<view class="scroll-safe-bottom"></view>
 			</scroll-view>
 		</view>
 		<!-- menu end -->
@@ -496,6 +497,7 @@
 		},
 		onShow() {
 			this.subCurrent = uni.getStorageSync('subCurrent') || 0
+			this.restoreCartFromStorage()
 			const keyword = uni.getStorageSync('menuSearchKeyword')
 			if (keyword) {
 				uni.removeStorageSync('menuSearchKeyword')
@@ -562,6 +564,7 @@
 						items: [],
 						updated_at: 0
 					}
+					this.cartMap = {}
 					return
 				}
 				if (
@@ -1352,6 +1355,7 @@
 
 	.page-view {
 		padding: 16rpx;
+		padding-bottom: 220rpx;
 	}
 
 	.current-category-title {
@@ -1813,5 +1817,9 @@
 			color: #EE2F37;
 			font-weight: bold;
 		}
+	}
+
+	.scroll-safe-bottom {
+		height: 240rpx;
 	}
 </style>

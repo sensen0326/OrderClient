@@ -14,11 +14,8 @@ dist/
 
 # 微信小程序编译输出（含 .sourcemap）
 unpackage/
-unpackage/dist/
-unpackage/dev/
-unpackage/cache/
-unpackage/resources/
-unpackage/**/*.log
+unpackage/*
+
 
 # IDE / 编辑器
 .idea/

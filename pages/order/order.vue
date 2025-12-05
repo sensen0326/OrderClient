@@ -1,103 +1,132 @@
 <template>
-	<view>
-		<!-- list start -->
-		<view class="content" v-for="(item,index) in orderList" :key="index">
-			<view class="content__header">
-				<view class="flex">
-					<view class="content__vip">
-						{{item.eatStatus}}
-					</view>
-					<view class="content__address">
-						{{item.address}}
-					</view>
-				</view>
-				<view class="content__status">
-					{{item.status}}
-				</view>
-			</view>
-			<view v-for="(item1,index1) in orderList[index].menu" :key="index1" class="menulist" @click="orderDetail">
-				<view>
-					<image class="item-menu-image" :src="item1.icon" mode="aspectFill"></image>
-				</view>
-				<view class="item-menu-name">
-					<text class="item-menu-name__name">{{item1.name}}</text>
-					<view class="item-menu-name__desc u-line-2">
-						{{item1.desc}}
-					</view>
-					<view class="item-menu-price">
-						<view class="item-menu-price__color">
-							<text class="u-font-20 item-menu-price__text">￥</text>
-							{{item1.price}}
+	<view class="order-page">
+		<view v-if="loading" class="order-hint">订单加载中...</view>
+		<view v-else-if="!orderList.length" class="order-hint">暂无订单，去点餐吧～</view>
+		<view v-else>
+			<view class="content" v-for="order in orderList" :key="order.order_no">
+				<view class="content__header">
+					<view class="flex">
+						<view class="content__vip">
+							{{order.channelText}}
 						</view>
-						<view class="item-menu-price__num">
-							x{{item1.num}}
+						<view class="content__address">
+							{{order.addressText}}
 						</view>
 					</view>
+					<view class="content__status">
+						{{order.statusText}}
+					</view>
 				</view>
-			</view>
-			<view class="total-price">共计{{item.num}}件商品，合计：￥{{item.price}}</view>
-			<view class="again-btn" @click="oneMore">
-				<u-tag text="再来一单" mode="plain" shape="circle" type="info" />
+				<view
+					v-for="(item, index1) in order.items"
+					:key="index1"
+					class="menulist"
+					@click="orderDetail(order.order_no)"
+				>
+					<view>
+						<image class="item-menu-image" :src="item.icon" mode="aspectFill"></image>
+					</view>
+					<view class="item-menu-name">
+						<text class="item-menu-name__name">{{item.name}}</text>
+						<view class="item-menu-name__desc u-line-2">
+							{{item.desc}}
+						</view>
+						<view class="item-menu-price">
+							<view class="item-menu-price__color">
+								<text class="u-font-20 item-menu-price__text">¥</text>
+								{{formatAmount(item.price)}}
+							</view>
+							<view class="item-menu-price__num">
+								x{{item.quantity}}
+							</view>
+						</view>
+					</view>
+				</view>
+				<view class="total-price">共{{order.items_count}}件商品，合计：¥{{formatAmount(order.payable)}}</view>
+				<view class="again-btn" @click="oneMore">
+					<u-tag text="再来一单" mode="plain" shape="circle" type="info" />
+				</view>
 			</view>
 		</view>
-		<!-- list end -->
 	</view>
 </template>
 
 <script>
+	import orderService from '@/common/services/order.js'
+
+	const STATUS_TEXT = {
+		pending: '待支付',
+		paid: '已支付',
+		preparing: '备餐中',
+		delivering: '配送中',
+		completed: '已完成',
+		cancelled: '已取消'
+	}
+
+	const CHANNEL_TEXT = {
+		dine_in: '堂食',
+		takeout: '外卖'
+	}
+
 	export default {
 		data() {
 			return {
-				// orderlist
-				orderList: [{
-					eatStatus: '堂食',
-					address: '私房菜（万达广场店）',
-					status: '已完成',
-					menu: [{
-						icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/menulist/gbyd.png',
-						name: '干煸芸豆',
-						desc: '芸豆+麻椒+老干妈+芝麻+辣椒',
-						price: 16,
-						num: 1
-					}],
-					num: 1,
-					price: 16
-				}, {
-					eatStatus: '外卖',
-					address: '北京市朝阳区万豪公馆...',
-					status: '已取消',
-					menu: [{
-						icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/menulist/tclj.png',
-						name: '糖醋里脊',
-						desc: '猪肉+醋+糖',
-						price: 28,
-						num: 1
-					}, {
-						icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/menulist/xhscjd.png',
-						name: '西红柿炒鸡蛋',
-						desc: '西红柿+高筋面粉+鸡蛋+淀粉',
-						price: 14,
-						num: 1
-					}, {
-						icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/menulist/mf.png',
-						name: '米饭',
-						desc: '五常大米+水',
-						price: 2.5,
-						num: 2
-					}],
-					num: 4,
-					price: 47
-				}]
+				orderList: [],
+				loading: false
 			}
 		},
+		onShow() {
+			this.fetchOrders()
+		},
 		methods: {
-			// orderdetail
-			orderDetail() {
+			formatAmount(val) {
+				return Number(val || 0).toFixed(2)
+			},
+			formatOrder(raw) {
+				const itemsSource = Array.isArray(raw.items_snapshot) && raw.items_snapshot.length ? raw.items_snapshot : (raw.items || [])
+				const items = itemsSource.map(item => ({
+					icon: item.icon || item.dishImg || item.cover || '',
+					name: item.name || item.dishName || item.dish_name || '',
+					desc: item.desc || item.optionsText || item.options_text || '',
+					price: Number(item.price || item.unit_price || 0),
+					quantity: Number(item.value || item.quantity || 0)
+				}))
+				return {
+					...raw,
+					items,
+					channelText: CHANNEL_TEXT[raw.channel] || CHANNEL_TEXT.dine_in,
+					addressText: raw.channel === 'takeout'
+						? ((raw.address && (raw.address.detail || raw.address.receiver)) || '外卖订单')
+						: (raw.table_no ? `桌号 ${raw.table_no}` : '堂食'),
+					statusText: STATUS_TEXT[raw.order_status] || raw.order_status,
+					payable: raw.amount_detail && typeof raw.amount_detail.payable !== 'undefined'
+						? raw.amount_detail.payable
+						: items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+				}
+			},
+			async fetchOrders() {
+				this.loading = true
+				try {
+					const res = await orderService.list({
+						page: 1,
+						pageSize: 20
+					})
+					const list = Array.isArray(res.list) ? res.list : []
+					this.orderList = list.map(this.formatOrder)
+				} catch (err) {
+					console.error('load orders failed', err)
+					this.$u.toast(err.message || '加载订单失败')
+					this.orderList = []
+				} finally {
+					this.loading = false
+				}
+			},
+			orderDetail(orderNo) {
+				if (!orderNo) return
 				uni.navigateTo({
-					url: "/subPack/order/orderDetail"
+					url: `/subPack/order/orderDetail?orderNo=${orderNo}`
 				})
 			},
-			// again
 			oneMore() {
 				uni.switchTab({
 					url: '/pages/menu/menu'
@@ -108,12 +137,22 @@
 </script>
 
 <style lang="scss">
+	.order-page {
+		padding: 30rpx;
+	}
+
+	.order-hint {
+		text-align: center;
+		color: $u-type-info;
+		margin-top: 120rpx;
+	}
+
 	.flex {
 		display: flex;
 	}
 
 	.content {
-		margin: 30rpx;
+		margin-bottom: 30rpx;
 		padding: 20rpx;
 		box-shadow: 2px 0px 8px 0px rgba(243, 244, 246, 0.95);
 

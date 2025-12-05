@@ -14,7 +14,7 @@
           </view>
         </view>
         <view class="header__avatar">
-          <u-avatar src="/static/my/avatarurl.jpg" size="180" show-level level-bg-color="#fa3534"></u-avatar>
+          <u-avatar src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/avatarurl.jpg" size="180" show-level level-bg-color="#fa3534"></u-avatar>
         </view>
       </view>
     </view>
@@ -46,10 +46,10 @@ export default {
   data() {
     return {
       serviceList: [
-        { icon: '/static/my/icon-1.png', text: '积分签到' },
-        { icon: '/static/my/icon-2.png', text: '积分商城' },
-        { icon: '/static/my/icon-3.png', text: '领券中心' },
-        { icon: '/static/my/icon-4.png', text: '联系客服' }
+        { icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/icon-1.png', text: '积分签到' },
+        { icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/icon-2.png', text: '积分商城' },
+        { icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/icon-3.png', text: '领券中心' },
+        { icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/icon-4.png', text: '联系客服' }
       ]
     }
   }

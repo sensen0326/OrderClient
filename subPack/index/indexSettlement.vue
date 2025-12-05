@@ -139,8 +139,8 @@
 				</view>
 				<view class="u-bottom__nums">共{{orderNum}} 件商品</view>
 			</view>
-			<view class="u-bottom__place" @click="confirmPay">
-				确认支付
+			<view class="u-bottom__place" :class="{'is-disabled': !orderNum || submitLoading}" @click="confirmPay">
+				{{ submitLoading ? '处理中' : '确认支付' }}
 			</view>
 		</view>
 
@@ -151,8 +151,13 @@
 					<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/menu/index-dining.png" width="220" height="180"></u-image>
 					<view class="popup-title">请选择用餐人数</view>
 					<u-grid :col="4" :border="false" hover-class="none">
-						<u-grid-item v-for="item in 12" :key="item" :custom-style="customStyle" @click="SelectPeople(item)">
-							<view class="u-font-weight">{{item}}</view>
+						<u-grid-item
+							v-for="person in peopleOptions"
+							:key="person"
+							:custom-style="customStyle"
+							@click="SelectPeople(person)"
+						>
+							<view class="u-font-weight">{{person}}</view>
 						</u-grid-item>
 					</u-grid>
 				</view>
@@ -269,6 +274,9 @@
 </template>
 
 <script>
+	import orderService from '@/common/services/order.js'
+	import cartService from '@/common/services/cart.js'
+
 	export default {
 		data() {
 			return {
@@ -347,11 +355,13 @@
 					backgroundColor: '#f4f4f5'
 				},
 				tags: ['不要葱', '少放辣', '多放辣', '少盐', '不要香菜', '不要花生', '少油', '多餐具'],
+				peopleOptions: Array.from({ length: 12 }, (_, i) => i + 1),
 				inputStyle: {
 					backgroundColor: '#f3f4f6',
 					borderRadius: '20rpx',
 					padding: '30rpx'
-				}
+				},
+				submitLoading: false
 			}
 		},
 		computed: {
@@ -425,7 +435,7 @@
 			}
 			this.selectedAddressId = profile.selectedAddressId || (this.addressList[0] && this.addressList[0].id) || ''
 			if (profile.channel === this.cartChannel) {
-				this.form.people = profile.lastPeople || 0
+				this.form.people = Number(profile.lastPeople) > 0 ? Number(profile.lastPeople) : 0
 				this.form.mealsTime = profile.lastMealsTime || ''
 				this.form.leave = profile.lastLeave || ''
 				this.invoiceInfo = profile.invoice || this.invoiceInfo
@@ -555,19 +565,90 @@
 				this.form.leave = `${this.form.leave}；${param}`
 			},
 			SelectPeople(param) {
-				this.form.people = param
+				const people = Number(param) || 0
+				this.form.people = people > 0 ? people : 1
 				this.PopupShow = false
 			},
 			mealsPicker(param) {
 				this.form.mealsTime = `${param.day} ${param.hour}:${param.minute}`
 			},
+			buildOrderItemsSnapshot() {
+				return this.orderList
+					.filter(item => Number(item.value || 0) > 0)
+					.map(item => ({
+						dishId: item.dishId || '',
+						dishName: item.name || item.dishName || '',
+						name: item.name || item.dishName || '',
+						desc: item.desc || '',
+						icon: item.icon || item.dishImg || '',
+						skuId: item.skuId || '',
+						skuName: item.skuName || '',
+						optionsText: item.optionsText || '',
+						options: item.options || [],
+						price: Number(item.price || 0),
+						value: Number(item.value || 0),
+						quantity: Number(item.value || 0)
+					}))
+			},
+			buildOrderPayload() {
+				return {
+					sessionId: this.sessionId || uni.getStorageSync('cartSessionId') || 'local',
+					channel: this.cartChannel,
+					tableInfo: this.tableInfo,
+					peopleCount: this.cartChannel === 'dine_in' ? this.form.people : 0,
+					remark: this.form.leave || '',
+					mealsTime: this.form.mealsTime || '',
+					utensilsCount: this.utensilsCount || 0,
+					couponId: this.selectedCouponId || '',
+					invoice: this.invoiceInfo.needInvoice ? { ...this.invoiceInfo } : {},
+					address: this.cartChannel === 'takeout' ? (this.selectedAddress ? { ...this.selectedAddress } : null) : null,
+					itemsSnapshot: this.buildOrderItemsSnapshot(),
+					feeDetail: {
+						goods: Number(this.feeDetail.goodsTotal || 0),
+						packageFee: Number(this.feeDetail.packageFee || 0),
+						deliveryFee: Number(this.feeDetail.deliveryFee || 0),
+						discount: Number(this.feeDetail.discount || 0),
+						payable: Number(this.feeDetail.payable || 0)
+					}
+				}
+			},
+			async clearCartCaches(targetSession) {
+				const sessionId = targetSession || this.sessionId || 'local'
+				try {
+					await cartService.clear({ sessionId })
+				} catch (err) {
+					console.warn('clear remote cart failed', err)
+				}
+				this.orderList = []
+				this.orderNum = 0
+				this.orderPrice = 0
+				this.feeDetail = {
+					goodsTotal: 0,
+					packageFee: 0,
+					deliveryFee: 0,
+					discount: 0,
+					payable: 0
+				}
+				uni.removeStorageSync('dishData')
+				uni.removeStorageSync('menuCartData')
+				uni.removeStorageSync('menuCartDataRemoteShadow')
+				uni.setStorageSync('cartLastClearedAt', Date.now())
+			},
+
+
 			async confirmPay() {
+				if (this.submitLoading) return
 				if (this.cartChannel === 'dine_in' && !this.form.people) {
 					this.$u.toast('请选择用餐人数')
 					return
 				}
 				if (this.cartChannel === 'takeout' && !this.selectedAddressId) {
 					this.$u.toast('请选择送餐地址')
+					return
+				}
+				const itemsSnapshot = this.buildOrderItemsSnapshot()
+				if (!itemsSnapshot.length) {
+					this.$u.toast('请重新选择菜品')
 					return
 				}
 				const profile = {
@@ -579,16 +660,35 @@
 					invoice: this.invoiceInfo,
 					utensilsCount: this.utensilsCount
 				}
+				const payload = this.buildOrderPayload()
+				this.submitLoading = true
+				uni.showLoading({
+					title: '正在创建订单',
+					mask: true
+				})
 				uni.setStorage({
 					key: 'checkoutProfile',
 					data: profile
 				})
-				this.$u.toast('已生成订单草稿，模拟支付成功')
-				setTimeout(() => {
-					uni.redirectTo({
-						url: '/subPack/index/indexPaysuccess'
-					})
-				}, 500)
+				try {
+					const res = await orderService.createFromCart(payload)
+					const orderNo = res.orderNo || (res.order && (res.order.order_no || res.order.orderNo)) || ''
+					if (orderNo) {
+						uni.setStorageSync('lastOrderNo', orderNo)
+					}
+					await this.clearCartCaches(payload.sessionId)
+					this.$u.toast('订单已提交')
+					setTimeout(() => {
+						const url = orderNo ? '/subPack/index/indexPaysuccess?orderNo=' + orderNo : '/subPack/index/indexPaysuccess'
+						uni.redirectTo({ url })
+					}, 400)
+				} catch (err) {
+					console.error('create order failed', err)
+					this.$u.toast(err.message || '下单失败，请稍后再试')
+				} finally {
+					uni.hideLoading()
+					this.submitLoading = false
+				}
 			}
 		}
 	}
