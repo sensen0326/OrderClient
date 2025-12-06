@@ -274,7 +274,8 @@
 </template>
 
 <script>
-	import orderService from '@/common/services/order.js'
+import orderService from '@/common/services/order.js'
+import paymentService from '@/common/services/payment.js'
 	import cartService from '@/common/services/cart.js'
 
 	export default {
@@ -651,36 +652,44 @@
 					this.$u.toast('请重新选择菜品')
 					return
 				}
-				const profile = {
-					channel: this.cartChannel,
-					lastPeople: this.form.people,
-					lastMealsTime: this.form.mealsTime,
-					lastLeave: this.form.leave,
-					selectedAddressId: this.selectedAddressId,
-					invoice: this.invoiceInfo,
-					utensilsCount: this.utensilsCount
-				}
 				const payload = this.buildOrderPayload()
 				this.submitLoading = true
 				uni.showLoading({
 					title: '正在创建订单',
 					mask: true
 				})
-				uni.setStorage({
-					key: 'checkoutProfile',
-					data: profile
-				})
+				let orderNo = ''
 				try {
 					const res = await orderService.createFromCart(payload)
-					const orderNo = res.orderNo || (res.order && (res.order.order_no || res.order.orderNo)) || ''
-					if (orderNo) {
-						uni.setStorageSync('lastOrderNo', orderNo)
+					orderNo = res.orderNo || (res.order && (res.order.order_no || res.order.orderNo)) || ''
+					if (!orderNo) {
+						throw new Error('订单信息异常')
 					}
+					uni.setStorageSync('lastOrderNo', orderNo)
 					await this.clearCartCaches(payload.sessionId)
-					this.$u.toast('订单已提交')
+					uni.removeStorageSync('checkoutProfile')
+					let paid = false
+					try {
+						await paymentService.payOrder(orderNo, {
+							payChannel: this.cartChannel === 'takeout' ? 'wxpay_mp' : 'wxpay',
+							amount: this.feeDetail.payable
+						})
+						paid = true
+					} catch (payErr) {
+						console.warn('pay order failed', payErr)
+						this.$u.toast(payErr.message || '支付未完成，订单已保留待支付')
+					}
 					setTimeout(() => {
-						const url = orderNo ? '/subPack/index/indexPaysuccess?orderNo=' + orderNo : '/subPack/index/indexPaysuccess'
-						uni.redirectTo({ url })
+						if (paid) {
+							this.$u.toast('支付成功')
+							uni.redirectTo({
+								url: `/subPack/index/indexPaysuccess?orderNo=${orderNo}`
+							})
+						} else {
+							uni.redirectTo({
+								url: `/subPack/order/orderDetail?orderNo=${orderNo}`
+							})
+						}
 					}, 400)
 				} catch (err) {
 					console.error('create order failed', err)

@@ -53,6 +53,10 @@
 				<u-cell-item title="发票" :value="invoiceText" :arrow="false" :border-bottom="false"></u-cell-item>
 			</u-cell-group>
 
+			<view class="refund-bar" v-if="orderInfo && orderInfo.pay_status === 'paid'">
+				<u-button type="error" plain @click="applyRefund">申请退款</u-button>
+			</view>
+
 			<view class="status-actions" v-if="statusActions.length">
 				<view class="status-actions__title">手动更新状态</view>
 				<view class="status-actions__btns">
@@ -84,6 +88,7 @@
 
 <script>
 	import orderService, { STATUS_FLOW } from '@/common/services/order.js'
+	import paymentService from '@/common/services/payment.js'
 
 	const STATUS_TEXT = {
 		pending: '待支付',
@@ -101,7 +106,8 @@
 				orderInfo: null,
 				orderItems: [],
 				statusLogs: [],
-				loading: false
+				loading: false,
+				refundLoading: false
 			}
 		},
 		computed: {
@@ -201,6 +207,23 @@
 					console.error('update status failed', err)
 					this.$u.toast(err.message || '更新状态失败')
 				}
+			},
+			async applyRefund() {
+				if (!this.orderNo || this.refundLoading) return
+				this.refundLoading = true
+				try {
+					await paymentService.refund({
+						orderNo: this.orderNo,
+						reason: '用户申请退款'
+					})
+					this.$u.toast('退款申请成功')
+					this.fetchDetail()
+				} catch (err) {
+					console.error('refund failed', err)
+					this.$u.toast(err.message || '退款失败')
+				} finally {
+					this.refundLoading = false
+				}
 			}
 		}
 	}
@@ -277,6 +300,10 @@
 
 	.status-button {
 		width: auto;
+	}
+
+	.refund-bar {
+		margin: 30rpx 0;
 	}
 
 	.status-log {
