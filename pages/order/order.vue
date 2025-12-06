@@ -1,7 +1,27 @@
 <template>
 	<view class="order-page">
+		<view class="order-filter">
+			<u-search
+				v-model="searchKeyword"
+				placeholder="搜索订单号"
+				shape="round"
+				:bg-color="'#f6f7fb'"
+				:show-action="false"
+				@search="handleSearch"
+				@custom="handleSearch"
+				@clear="handleClear"
+			></u-search>
+			<u-tabs
+				class="order-tabs"
+				:list="statusTabs"
+				:current="currentTabIndex"
+				@change="handleStatusChange"
+				active-color="#EE2F37"
+				:scroll="false"
+			></u-tabs>
+		</view>
 		<view v-if="loading" class="order-hint">订单加载中...</view>
-		<view v-else-if="!orderList.length" class="order-hint">暂无订单，去点餐吧～</view>
+		<view v-else-if="!orderList.length" class="order-hint">暂无订单，快去下单试试吧～</view>
 		<view v-else>
 			<view class="content" v-for="order in orderList" :key="order.order_no">
 				<view class="content__header">
@@ -43,8 +63,18 @@
 					</view>
 				</view>
 				<view class="total-price">共{{order.items_count}}件商品，合计：¥{{formatAmount(order.payable)}}</view>
-				<view class="again-btn" @click="oneMore">
-					<u-tag text="再来一单" mode="plain" shape="circle" type="info" />
+				<view class="order-actions">
+					<u-button
+						v-for="action in order.actions"
+						:key="action.key"
+						size="mini"
+						:type="action.danger ? 'error' : 'primary'"
+						:plain="action.key !== 'pay'"
+						class="action-btn"
+						@click="handleAction(action.key, order)"
+					>
+						{{action.label}}
+					</u-button>
 				</view>
 			</view>
 		</view>
@@ -53,6 +83,7 @@
 
 <script>
 	import orderService from '@/common/services/order.js'
+	import paymentService from '@/common/services/payment.js'
 
 	const STATUS_TEXT = {
 		pending: '待支付',
@@ -72,11 +103,27 @@
 		data() {
 			return {
 				orderList: [],
-				loading: false
+				loading: false,
+				statusTabs: [
+					{ name: '全部', value: '' },
+					{ name: '待支付', value: 'pending' },
+					{ name: '已支付', value: 'paid' },
+					{ name: '备餐中', value: 'preparing' },
+					{ name: '配送中', value: 'delivering' },
+					{ name: '已完成', value: 'completed' }
+				],
+				currentTabIndex: 0,
+				searchKeyword: ''
 			}
 		},
 		onShow() {
 			this.fetchOrders()
+		},
+		computed: {
+			currentStatus() {
+				const tab = this.statusTabs[this.currentTabIndex]
+				return tab ? tab.value : ''
+			}
 		},
 		methods: {
 			formatAmount(val) {
@@ -91,7 +138,7 @@
 					price: Number(item.price || item.unit_price || 0),
 					quantity: Number(item.value || item.quantity || 0)
 				}))
-				return {
+				const formatted = {
 					...raw,
 					items,
 					channelText: CHANNEL_TEXT[raw.channel] || CHANNEL_TEXT.dine_in,
@@ -103,13 +150,32 @@
 						? raw.amount_detail.payable
 						: items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 				}
+				formatted.actions = this.buildActions(formatted)
+				return formatted
+			},
+			buildActions(order) {
+				const actions = []
+				if (['paid', 'preparing', 'delivering'].includes(order.order_status)) {
+					actions.push({ key: 'remind', label: '催单' })
+				}
+				if (['pending'].includes(order.order_status)) {
+					actions.push({ key: 'cancel', label: '取消订单', danger: true })
+				}
+				if (order.pay_status === 'paid' && ['paid', 'preparing', 'delivering', 'completed'].includes(order.order_status)) {
+					actions.push({ key: 'refund', label: '申请售后', danger: true })
+				}
+				actions.push({ key: 'detail', label: '查看详情' })
+				actions.push({ key: 'repeat', label: '再来一单' })
+				return actions
 			},
 			async fetchOrders() {
 				this.loading = true
 				try {
 					const res = await orderService.list({
 						page: 1,
-						pageSize: 20
+						pageSize: 20,
+						status: this.currentStatus,
+						keyword: this.searchKeyword.trim()
 					})
 					const list = Array.isArray(res.list) ? res.list : []
 					this.orderList = list.map(this.formatOrder)
@@ -131,6 +197,102 @@
 				uni.switchTab({
 					url: '/pages/menu/menu'
 				})
+			},
+			handleStatusChange({ index }) {
+				this.currentTabIndex = index
+				this.fetchOrders()
+			},
+			handleSearch(value) {
+				this.searchKeyword = value
+				this.fetchOrders()
+			},
+			handleClear() {
+				this.searchKeyword = ''
+				this.fetchOrders()
+			},
+			handleAction(action, order) {
+				if (!order) return
+				if (action === 'repeat') {
+					this.oneMore()
+					return
+				}
+				if (action === 'detail') {
+					this.orderDetail(order.order_no)
+					return
+				}
+				if (action === 'cancel') {
+					this.cancelOrder(order)
+					return
+				}
+				if (action === 'refund') {
+					this.refundOrder(order)
+					return
+				}
+				if (action === 'remind') {
+					this.remindOrder(order)
+				}
+			},
+			showConfirm(options) {
+				return new Promise(resolve => {
+					uni.showModal({
+						...options,
+						success: resolve,
+						fail: () => resolve({ confirm: false, cancel: true })
+					})
+				})
+			},
+			async cancelOrder(order) {
+				const orderNo = order.order_no
+				if (!orderNo) return
+				const res = await this.showConfirm({
+					title: '取消订单',
+					content: '确定要取消该订单吗？'
+				})
+				if (!res.confirm) return
+				try {
+					await orderService.cancel({
+						orderNo,
+						reason: '用户取消'
+					})
+					this.$u.toast('订单已取消')
+					this.fetchOrders()
+				} catch (err) {
+					console.error('cancel order failed', err)
+					this.$u.toast(err.message || '取消订单失败')
+				}
+			},
+			async refundOrder(order) {
+				const orderNo = order.order_no
+				if (!orderNo) return
+				const res = await this.showConfirm({
+					title: '申请售后',
+					content: '将提交整单售后申请，确认继续吗？'
+				})
+				if (!res.confirm) return
+				try {
+					await paymentService.refund({
+						orderNo,
+						reason: 'C端售后申请'
+					})
+					this.$u.toast('售后申请已提交')
+					this.fetchOrders()
+				} catch (err) {
+					console.error('refund failed', err)
+					this.$u.toast(err.message || '申请失败')
+				}
+			},
+			async remindOrder(order) {
+				const orderNo = order.order_no
+				if (!orderNo) return
+				try {
+					await orderService.remind({
+						orderNo
+					})
+					this.$u.toast('已为您催单')
+				} catch (err) {
+					console.error('remind failed', err)
+					this.$u.toast(err.message || '催单失败')
+				}
 			}
 		}
 	}
@@ -139,6 +301,14 @@
 <style lang="scss">
 	.order-page {
 		padding: 30rpx;
+	}
+
+	.order-filter {
+		margin-bottom: 20rpx;
+	}
+
+	.order-tabs {
+		margin-top: 20rpx;
 	}
 
 	.order-hint {
@@ -236,9 +406,15 @@
 		margin-top: 30rpx;
 	}
 
-	.again-btn {
+	.order-actions {
 		display: flex;
 		justify-content: flex-end;
-		margin-top: 30rpx;
+		flex-wrap: wrap;
+		gap: 16rpx;
+		margin-top: 20rpx;
+	}
+
+	.action-btn {
+		width: auto;
 	}
 </style>

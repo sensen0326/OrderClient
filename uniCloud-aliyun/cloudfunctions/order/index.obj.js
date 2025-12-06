@@ -1,6 +1,7 @@
 'use strict'
 
 const db = uniCloud.database()
+const dbCmd = db.command
 const ORDER_COLLECTION = 'order'
 const ORDER_ITEM_COLLECTION = 'order_item'
 const ORDER_STATUS_COLLECTION = 'order_status_log'
@@ -154,6 +155,13 @@ module.exports = {
 		if (params.status) {
 			where.order_status = params.status
 		}
+		const keyword = (params.keyword || params.orderNo || '').trim()
+		if (keyword) {
+			where.order_no = dbCmd.regex({
+				regex: keyword,
+				options: 'i'
+			})
+		}
 		const res = await db.collection(ORDER_COLLECTION)
 			.where(where)
 			.orderBy('created_at', 'desc')
@@ -161,7 +169,8 @@ module.exports = {
 			.limit(pageSize)
 			.get()
 		return {
-			list: res.data || []
+			list: res.data || [],
+			hasMore: (res.data || []).length === pageSize
 		}
 	},
 	async detail(params = {}) {
@@ -238,6 +247,59 @@ module.exports = {
 		return {
 			success: true,
 			status: nextStatus
+		}
+	},
+	async cancel(params = {}) {
+		const orderNo = params.orderNo
+		if (!orderNo) {
+			throw new Error('orderNo is required')
+		}
+		const reason = params.reason || '用户取消订单'
+		const orderRes = await db.collection(ORDER_COLLECTION).doc(orderNo).get()
+		if (!orderRes.data || !orderRes.data.length) {
+			throw new Error('order not found')
+		}
+		const order = orderRes.data[0]
+		if (!['pending', 'paid', 'preparing'].includes(order.order_status)) {
+			throw new Error('order cannot be cancelled')
+		}
+		const updates = {
+			order_status: 'cancelled',
+			fulfill_status: 'cancelled',
+			updated_at: Date.now()
+		}
+		if (order.pay_status === 'paid') {
+			updates.pay_status = 'refund_pending'
+		}
+		await db.collection(ORDER_COLLECTION).doc(orderNo).update(updates)
+		await appendStatusLog(db, orderNo, 'cancelled', params.operator || 'user', reason)
+		return {
+			success: true,
+			status: 'cancelled'
+		}
+	},
+	async remind(params = {}) {
+		const orderNo = params.orderNo
+		if (!orderNo) {
+			throw new Error('orderNo is required')
+		}
+		const orderRes = await db.collection(ORDER_COLLECTION).doc(orderNo).get()
+		if (!orderRes.data || !orderRes.data.length) {
+			throw new Error('order not found')
+		}
+		const order = orderRes.data[0]
+		if (!['paid', 'preparing', 'delivering'].includes(order.order_status)) {
+			throw new Error('order status cannot be reminded')
+		}
+		await db.collection(ORDER_STATUS_COLLECTION).add({
+			order_no: orderNo,
+			status: order.order_status,
+			note: params.note || '用户催单',
+			operator: params.operator || 'user',
+			created_at: Date.now()
+		})
+		return {
+			success: true
 		}
 	}
 }

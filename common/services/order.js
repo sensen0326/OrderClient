@@ -117,7 +117,15 @@ const orderService = {
 		if (!orderObj) {
 			const list = readLocalOrders()
 			const sessionId = params.sessionId
-			const filtered = sessionId ? list.filter(item => item.session_id === sessionId) : list
+			const status = params.status
+			const keyword = (params.keyword || '').trim()
+			let filtered = sessionId ? list.filter(item => item.session_id === sessionId) : list
+			if (status) {
+				filtered = filtered.filter(item => item.order_status === status)
+			}
+			if (keyword) {
+				filtered = filtered.filter(item => (item.order_no || '').toLowerCase().includes(keyword.toLowerCase()))
+			}
 			return {
 				list: filtered
 			}
@@ -185,6 +193,59 @@ const orderService = {
 			}
 		}
 		return orderObj.updateStatus(params)
+	},
+	async cancel(params = {}) {
+		const orderObj = getOrderObject()
+		if (!orderObj) {
+			const list = readLocalOrders()
+			const order = list.find(item => item.order_no === params.orderNo)
+			if (!order) {
+				throw new Error(ERROR_TEXT.notFound)
+			}
+			if (!['pending', 'paid', 'preparing'].includes(order.order_status)) {
+				throw new Error(ERROR_TEXT.invalidStatus)
+			}
+			order.order_status = 'cancelled'
+			order.fulfill_status = 'cancelled'
+			if (order.pay_status === 'paid') {
+				order.pay_status = 'refund_pending'
+			}
+			order.updated_at = Date.now()
+			order.logs = order.logs || []
+			order.logs.push({
+				status: 'cancelled',
+				note: params.reason || '用户取消订单',
+				operator: 'local',
+				created_at: Date.now()
+			})
+			writeLocalOrders(list)
+			return {
+				success: true
+			}
+		}
+		return orderObj.cancel(params)
+	},
+	async remind(params = {}) {
+		const orderObj = getOrderObject()
+		if (!orderObj) {
+			const list = readLocalOrders()
+			const order = list.find(item => item.order_no === params.orderNo)
+			if (!order) {
+				throw new Error(ERROR_TEXT.notFound)
+			}
+			order.logs = order.logs || []
+			order.logs.push({
+				status: order.order_status,
+				note: params.note || '用户催单',
+				operator: 'local',
+				created_at: Date.now()
+			})
+			writeLocalOrders(list)
+			return {
+				success: true
+			}
+		}
+		return orderObj.remind(params)
 	}
 }
 
