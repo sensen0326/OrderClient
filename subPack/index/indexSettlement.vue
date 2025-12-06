@@ -276,7 +276,8 @@
 <script>
 import orderService from '@/common/services/order.js'
 import paymentService from '@/common/services/payment.js'
-	import cartService from '@/common/services/cart.js'
+import cartService from '@/common/services/cart.js'
+import kitchenService from '@/common/services/kitchen.js'
 
 	export default {
 		data() {
@@ -678,6 +679,20 @@ import paymentService from '@/common/services/payment.js'
 					} catch (payErr) {
 						console.warn('pay order failed', payErr)
 						this.$u.toast(payErr.message || '支付未完成，订单已保留待支付')
+					}
+					if (paid) {
+						try {
+							await kitchenService.push({
+								orderNo,
+								channel: payload.channel,
+								tableInfo: payload.tableInfo,
+								peopleCount: payload.peopleCount,
+								itemsSnapshot,
+								markPaid: true
+							})
+						} catch (kitchenErr) {
+							console.warn('push kitchen ticket failed', kitchenErr)
+						}
 					}
 					setTimeout(() => {
 						if (paid) {

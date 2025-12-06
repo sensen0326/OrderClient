@@ -44,6 +44,32 @@
 
 			<u-gap height="20" bg-color="#f3f4f6" margin-top="30"></u-gap>
 
+			<view class="kitchen-card" v-if="kitchenTicket">
+				<view class="kitchen-card__header">
+					<view class="kitchen-card__title">备餐进度</view>
+					<view class="kitchen-card__status">{{kitchenStatusText}}</view>
+				</view>
+				<view class="kitchen-card__meta">
+					<text>出餐口：{{kitchenTicket.station_id || '默认出餐口'}}</text>
+					<text v-if="kitchenTicket.urgent" class="kitchen-card__tag">加急</text>
+				</view>
+				<view class="kitchen-events" v-if="kitchenEvents.length">
+					<view class="kitchen-event" v-for="(event, idx) in kitchenEvents" :key="idx">
+						<view class="kitchen-event__status">{{event.displayStatus}}</view>
+						<view class="kitchen-event__time">{{formatTime(event.created_at)}}</view>
+						<view class="kitchen-event__note" v-if="event.note">{{event.note}}</view>
+					</view>
+				</view>
+				<view class="kitchen-items" v-if="kitchenTicket.items && kitchenTicket.items.length">
+					<view class="kitchen-items__title">菜品</view>
+					<view class="kitchen-item" v-for="(dish, idx) in kitchenTicket.items" :key="idx">
+						<text class="kitchen-item__name">{{dish.name}}</text>
+						<text class="kitchen-item__sku" v-if="dish.sku_name">{{dish.sku_name}}</text>
+						<text class="kitchen-item__qty">x{{dish.quantity}}</text>
+					</view>
+				</view>
+			</view>
+
 			<view class="u-font-30 u-font-weight u-m-t-30 u-p-b-30 u-border-bottom">订单信息</view>
 			<u-cell-group :border="false">
 				<u-cell-item title="订单编号" :value="orderNo" :arrow="false"></u-cell-item>
@@ -89,11 +115,21 @@
 <script>
 	import orderService, { STATUS_FLOW } from '@/common/services/order.js'
 	import paymentService from '@/common/services/payment.js'
+	import kitchenService from '@/common/services/kitchen.js'
 
 	const STATUS_TEXT = {
 		pending: '待支付',
 		paid: '已支付',
 		preparing: '备餐中',
+		delivering: '配送中',
+		completed: '已完成',
+		cancelled: '已取消'
+	}
+
+	const KITCHEN_STATUS_TEXT = {
+		queued: '等待接单',
+		preparing: '备餐中',
+		ready: '待取餐',
 		delivering: '配送中',
 		completed: '已完成',
 		cancelled: '已取消'
@@ -107,7 +143,8 @@
 				orderItems: [],
 				statusLogs: [],
 				loading: false,
-				refundLoading: false
+				refundLoading: false,
+				kitchenTicket: null
 			}
 		},
 		computed: {
@@ -124,6 +161,21 @@
 					return '无需发票'
 				}
 				return this.orderInfo.invoice.title || '电子发票'
+			},
+			kitchenStatusText() {
+				if (!this.kitchenTicket) return ''
+				return KITCHEN_STATUS_TEXT[this.kitchenTicket.ticket_status] || this.kitchenTicket.ticket_status
+			},
+			kitchenEvents() {
+				if (!this.kitchenTicket || !Array.isArray(this.kitchenTicket.events)) {
+					return []
+				}
+				return this.kitchenTicket.events.slice().sort((a, b) => {
+					return Number(a.created_at || 0) - Number(b.created_at || 0)
+				}).map(event => ({
+					...event,
+					displayStatus: KITCHEN_STATUS_TEXT[event.status] || event.status
+				}))
 			}
 		},
 		onLoad(options) {
@@ -184,14 +236,30 @@
 						...log,
 						statusText: STATUS_TEXT[log.status] || log.status
 					}))
+					this.fetchKitchenTicket()
 				} catch (err) {
 					console.error('order detail load failed', err)
 					this.$u.toast(err.message || '加载订单详情失败')
 					this.orderInfo = null
 					this.orderItems = []
 					this.statusLogs = []
+					this.kitchenTicket = null
 				} finally {
 					this.loading = false
+				}
+			},
+			async fetchKitchenTicket() {
+				if (!this.orderNo) {
+					this.kitchenTicket = null
+					return
+				}
+				try {
+					const res = await kitchenService.listByOrder(this.orderNo)
+					const list = (res && res.list) || []
+					this.kitchenTicket = list.length ? list[0] : null
+				} catch (err) {
+					console.warn('load kitchen ticket failed', err)
+					this.kitchenTicket = null
 				}
 			},
 			async updateStatus(nextStatus) {
@@ -335,6 +403,101 @@
 			font-size: 24rpx;
 			color: #606266;
 			margin-top: 4rpx;
+		}
+	}
+
+	.kitchen-card {
+		margin-top: 30rpx;
+		padding: 30rpx;
+		border-radius: 24rpx;
+		background-color: #fff5f5;
+		box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.04);
+
+		&__header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		&__title {
+			font-size: 30rpx;
+			font-weight: bold;
+		}
+
+		&__status {
+			font-size: 26rpx;
+			color: #ee2f37;
+		}
+
+		&__meta {
+			font-size: 24rpx;
+			color: #606266;
+			margin-top: 10rpx;
+			display: flex;
+			align-items: center;
+			gap: 20rpx;
+		}
+
+		&__tag {
+			color: #ee2f37;
+			font-weight: bold;
+		}
+	}
+
+	.kitchen-events {
+		margin-top: 20rpx;
+		border-top: 1px dashed #f1c8c8;
+		padding-top: 10rpx;
+	}
+
+	.kitchen-event {
+		padding: 12rpx 0;
+
+		&__status {
+			font-weight: bold;
+			font-size: 26rpx;
+		}
+
+		&__time {
+			font-size: 24rpx;
+			color: #909399;
+		}
+
+		&__note {
+			font-size: 24rpx;
+			color: #606266;
+			margin-top: 4rpx;
+		}
+	}
+
+	.kitchen-items {
+		margin-top: 20rpx;
+
+		&__title {
+			font-weight: bold;
+			margin-bottom: 6rpx;
+		}
+	}
+
+	.kitchen-item {
+		display: flex;
+		align-items: center;
+		font-size: 24rpx;
+		color: #303133;
+		margin-bottom: 6rpx;
+		gap: 12rpx;
+
+		&__name {
+			font-weight: bold;
+		}
+
+		&__sku {
+			color: #909399;
+		}
+
+		&__qty {
+			margin-left: auto;
+			font-weight: bold;
 		}
 	}
 </style>

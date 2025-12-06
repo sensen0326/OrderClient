@@ -120,3 +120,12 @@
 - **关闭鉴权（当前默认）**：`uni_modules/uni-pay/uniCloud/cloudfunctions/uni-pay-co/config/security.js` 中将 `enableUniPayAuth` 设为 `false`。用于本地联调或演示，上传云端后退款等接口不再校验角色。
 - **重新开启鉴权**：将 `enableUniPayAuth` 改为 `true`，重新上传 `uni-pay-co` 到对应服务空间。此时会恢复 `config/permission.js` 中的管理员角色限制，并要求调用方传入合法的 uni-id token。
 - **注意**：切回生产前务必确认鉴权已开启，并在 README 中保留上述步骤以便后续团队成员同步。
+
+## 厨房 / 备餐通知（F10）
+- **数据与云对象**：新增 `kitchen_ticket` 集合（`uniCloud-aliyun/database/kitchen_ticket.schema.json`）与 `kitchen` 云对象，提供 `push`（推送订单到后厨）、`list`（按订单/档口查询）与 `updateStatus`（更新备餐/出餐状态），并与 `order_status_log` 打通。
+- **前端联动**：`subPack/index/indexSettlement.vue` 在支付成功后调用 `kitchenService.push`，自动生成厨房工单并将订单状态推进到“备餐中”。`subPack/order/orderDetail.vue` 新增“备餐进度”卡片，实时展示厨房事件、加急标记与菜品列表。
+- **测试方法**  
+  1. 使用 HBuilderX 真机调试完成一次下单 + 支付，支付成功后在 uniCloud 控制台（数据库 -> `kitchen_ticket`）可看到新工单。  
+  2. 在 “订单详情” 页面应出现“备餐进度”模块，默认状态为“备餐中”。  
+  3. 可在 HBuilderX 右键 `kitchen` 云对象 → 运行云对象，执行 `updateStatus({ orderNo: 'ODxxxx', nextStatus: 'ready' })` / `updateStatus({... 'completed'})`，订单详情中的时间线将同步更新。  
+  4. 若仅做本地模拟（未连接 uniCloud），`kitchenService` 会把工单缓存在本地，同样可以在订单详情看到进度。
