@@ -24,6 +24,16 @@
 					@change="subChange"
 				></u-subsection>
 			</view>
+			<view v-if="!subCurrent" class="table-quick-panel">
+				<view class="table-quick-panel__info">
+					<text>桌号 {{ tableInfo && tableInfo.tableNo ? tableInfo.tableNo : '未绑定' }}</text>
+					<text class="table-quick-panel__status">{{ tableStatusText }}</text>
+				</view>
+				<view class="table-quick-panel__actions">
+					<u-button size="mini" type="primary" @click="callWaiter">呼叫服务</u-button>
+					<u-button size="mini" plain @click="refreshTableInfo">刷新</u-button>
+				</view>
+			</view>
 		</view>
 		<!-- header end -->
 
@@ -366,6 +376,7 @@
 <script>
 	import dishService from '@/common/services/dish.js'
 	import cartService from '@/common/services/cart.js'
+	import tableService from '@/common/services/table.js'
 
 	export default {
 		data() {
@@ -460,6 +471,12 @@
 					return sum + unit * qty
 				}, 0)
 			},
+			tableStatusText() {
+				if (!this.tableInfo) return '未绑定'
+				if (this.tableInfo.status === 'occupied') return '已入座'
+				if (this.tableInfo.status === 'cleaning') return '清理中'
+				return '空闲'
+			},
 			specPopupSkus() {
 				const dish = this.specPopup.dish
 				return dish && Array.isArray(dish.skus) ? dish.skus : []
@@ -497,7 +514,14 @@
 		},
 		onShow() {
 			this.subCurrent = uni.getStorageSync('subCurrent') || 0
+			const latestTable = tableService.getLocal()
+			if (latestTable) {
+				this.tableInfo = latestTable
+			}
 			this.restoreCartFromStorage()
+			if (this.subCurrent === 0 && this.tableInfo && this.tableInfo.tableNo) {
+				this.refreshTableInfo()
+			}
 			const keyword = uni.getStorageSync('menuSearchKeyword')
 			if (keyword) {
 				uni.removeStorageSync('menuSearchKeyword')
@@ -521,9 +545,11 @@
 					})
 				}
 				this.cartSessionId = storedSession
-				this.tableInfo = uni.getStorageSync('tableInfo') || {
+				const storedTable = tableService.getLocal()
+				this.tableInfo = storedTable || {
 					tableNo: 'A01',
-					restaurantName: this.restaurantName,
+					status: 'idle',
+					peopleCount: Number(uni.getStorageSync('peopleCount') || 2),
 					distance: '0.2km'
 				}
 				this.restoreCartFromStorage()
@@ -595,6 +621,37 @@
 					}
 				})
 				this.cartMap = nextMap
+			},
+			async refreshTableInfo() {
+				if (!this.tableInfo || !this.tableInfo.tableNo || this.subCurrent !== 0) return
+				try {
+					const res = await tableService.status({
+						tableNo: this.tableInfo.tableNo
+					})
+					if (res && res.table) {
+						this.tableInfo = res.table
+						tableService.saveLocal(res.table)
+					}
+				} catch (err) {
+					console.warn('refresh table status failed', err)
+				}
+			},
+			async callWaiter() {
+				if (!this.tableInfo || !this.tableInfo.tableNo) {
+					this.$u.toast('请先在首页扫码绑定桌号')
+					return
+				}
+				try {
+					await tableService.callService({
+						tableNo: this.tableInfo.tableNo,
+						sessionId: this.tableInfo.sessionId,
+						type: 'waiter'
+					})
+					this.$u.toast('服务员已收到请求')
+				} catch (err) {
+					console.warn('call waiter failed', err)
+					this.$u.toast(err.message || '呼叫失败')
+				}
 			},
 			getCartChannel() {
 				return this.subCurrent === 1 ? 'takeout' : 'dine_in'
@@ -1356,6 +1413,34 @@
 	.page-view {
 		padding: 16rpx;
 		padding-bottom: 220rpx;
+	}
+
+	.table-quick-panel {
+		margin-top: 20rpx;
+		padding: 20rpx;
+		background-color: #fff7f5;
+		border-radius: 16rpx;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+
+		&__info {
+			display: flex;
+			flex-direction: column;
+			font-size: 28rpx;
+			color: #303133;
+		}
+
+		&__status {
+			font-size: 24rpx;
+			color: #ee2f37;
+			margin-top: 4rpx;
+		}
+
+		&__actions {
+			display: flex;
+			gap: 16rpx;
+		}
 	}
 
 	.current-category-title {

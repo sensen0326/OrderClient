@@ -1,0 +1,30 @@
+<view class="header__info">
+					<view class="header__name">{{ userProfile.nickname || '未登录' }}</view>
+					<view class="header__level">
+						<u-tag :text="userProfile.level_name || 'V0'" mode="plain" border-color="#EE2F37" color="#EE2F37" size="mini" shape="circle" />
+						<text class="header__vip-desc" v-if="userProfile.next_level_need">
+							距 {{ userProfile.next_level_name || '下一等级' }} 还差 {{ userProfile.next_level_need }} 积分
+						</text>
+					</view>
+					<u-line-progress active-color="#EE2F37" :percent="userProfile.level_progress || 0"></u-line-progress>
+                <view class="header__points">
+                    <view>
+                        <text class="label">积分</text>
+                        <text class="value">{{ userProfile.points || 0 }}</text>
+                    </view>
+                    <u-button size="mini" type="primary" plain :loading="signInLoading" @click="handleSignIn">签到 +10</u-button>
+                </view>
+                <view class="header__phone" v-if="isLoggedIn">
+                    <text class="label">手机号</text>
+                    <text class="value" v-if="userProfile.mobile">{{ userProfile.mobile }}</text>
+                    <u-button
+                        v-else
+                        size="mini"
+                        type="primary"
+                        :loading="phoneAuthLoading"
+                        open-type="getPhoneNumber"
+                        @getphonenumber="handleGetPhoneNumber"
+                    >授权手机号</u-button>
+                </view>
+            </view>
+				

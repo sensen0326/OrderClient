@@ -1,0 +1,63 @@
+{
+  "bsonType": "object",
+  "description": "优惠券模板",
+  "required": [
+    "title",
+    "amount",
+    "threshold",
+    "status"
+  ],
+  "permission": {
+    "read": true,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "模板 ID"
+    },
+    "title": {
+      "bsonType": "string",
+      "description": "券名称"
+    },
+    "amount": {
+      "bsonType": "double",
+      "description": "面值"
+    },
+    "threshold": {
+      "bsonType": "double",
+      "description": "使用门槛"
+    },
+    "channel_limit": {
+      "bsonType": "string",
+      "description": "dine_in/takeout/all"
+    },
+    "status": {
+      "bsonType": "string",
+      "description": "active/offline"
+    },
+    "total": {
+      "bsonType": "int",
+      "description": "发放总量"
+    },
+    "claimed": {
+      "bsonType": "int",
+      "description": "已领取量"
+    },
+    "valid_start": {
+      "bsonType": "double",
+      "description": "有效期开始"
+    },
+    "valid_end": {
+      "bsonType": "double",
+      "description": "有效期结束"
+    },
+    "created_at": {
+      "bsonType": "double"
+    },
+    "updated_at": {
+      "bsonType": "double"
+    }
+  }
+}

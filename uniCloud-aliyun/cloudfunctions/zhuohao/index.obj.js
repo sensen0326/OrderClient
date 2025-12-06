@@ -3,9 +3,9 @@
 const db = uniCloud.database()
 const dbCmd = db.command
 
-// 微信小程序配置（用户提供）
-const WEAPP_APPID = 'wxbde48866849ac33d'
-const WEAPP_SECRET = '2838341a00de5cbd3a4e93ce0e574429'
+// 微信小程序配置，可直接改写或通过环境变量覆盖
+const WEAPP_APPID = process.env.WX_APP_ID || 'wxbde48866849ac33d'
+const WEAPP_SECRET = process.env.WX_APP_SECRET || '2838341a00de5cbd3a4e93ce0e574429'
 const QR_PAGE = 'pages/index/index'
 const ENV_VERSION = 'release'
 

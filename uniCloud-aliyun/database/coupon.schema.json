@@ -1,0 +1,64 @@
+{
+  "bsonType": "object",
+  "description": "用户优惠券",
+  "required": [
+    "template_id",
+    "user_id",
+    "status"
+  ],
+  "permission": {
+    "read": true,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "券 ID"
+    },
+    "template_id": {
+      "bsonType": "string",
+      "description": "模板 ID"
+    },
+    "user_id": {
+      "bsonType": "string",
+      "description": "用户 ID"
+    },
+    "title": {
+      "bsonType": "string",
+      "description": "券标题"
+    },
+    "amount": {
+      "bsonType": "double",
+      "description": "优惠金额"
+    },
+    "threshold": {
+      "bsonType": "double",
+      "description": "门槛"
+    },
+    "channel_limit": {
+      "bsonType": "string",
+      "description": "限制渠道"
+    },
+    "status": {
+      "bsonType": "string",
+      "description": "unused/used/expired"
+    },
+    "valid_start": {
+      "bsonType": "double"
+    },
+    "valid_end": {
+      "bsonType": "double"
+    },
+    "order_no": {
+      "bsonType": "string",
+      "description": "核销订单"
+    },
+    "created_at": {
+      "bsonType": "double"
+    },
+    "updated_at": {
+      "bsonType": "double"
+    }
+  }
+}

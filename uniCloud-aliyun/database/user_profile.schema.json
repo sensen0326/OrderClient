@@ -1,0 +1,65 @@
+{
+  "bsonType": "object",
+  "description": "会员档案",
+  "required": [
+    "nickname",
+    "points",
+    "level",
+    "created_at"
+  ],
+  "permission": {
+    "read": true,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "用户 ID"
+    },
+    "openid": {
+      "bsonType": "string",
+      "description": "微信 openid 或模拟 ID"
+    },
+    "nickname": {
+      "bsonType": "string",
+      "description": "昵称"
+    },
+    "avatar": {
+      "bsonType": "string",
+      "description": "头像"
+    },
+    "mobile": {
+      "bsonType": "string",
+      "description": "手机号"
+    },
+    "level": {
+      "bsonType": "int",
+      "description": "会员等级"
+    },
+    "points": {
+      "bsonType": "int",
+      "description": "当前积分"
+    },
+    "experience": {
+      "bsonType": "int",
+      "description": "经验值"
+    },
+    "token": {
+      "bsonType": "string",
+      "description": "登录 token（演示用）"
+    },
+    "last_login_at": {
+      "bsonType": "double",
+      "description": "最近登录"
+    },
+    "created_at": {
+      "bsonType": "double",
+      "description": "创建时间"
+    },
+    "updated_at": {
+      "bsonType": "double",
+      "description": "更新时间"
+    }
+  }
+}

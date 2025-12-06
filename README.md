@@ -28,8 +28,9 @@
 - `subPack/order/orderDetail.vue` 展示单笔订单详情（菜品、金额、订单编号、支付方式、下单时间、备注等），用于支付成功后或历史订单中跳转查看。
 
 ### 我的（`pages/my/my.vue`）
-- 静态的会员卡片、头像、等级条和服务入口，用于展示整体视觉与模块布局。
-- 可在该页挂载真实的会员/积分数据，或跳转到 `积分商城、领券中心、联系客服` 等业务子页。
+- 接入 `member` 云对象与登录授权，支持微信头像/昵称同步、默认头像兜底以及会员等级/积分展示。
+- 提供每日签到、积分商城、优惠券中心、我的优惠券等组件，优惠券列表带骨架 loading、空态跳转按钮，便于快速体验真实运营场景。
+- 支持头像编辑、昵称修改、手机号授权，本地缓存会自动更新，且云端资料已避免被微信默认头像/昵称二次覆盖。
 
 ## 技术栈与依赖
 - **uni-app**：跨端开发框架，采用微信小程序语法规范，入口位于 `main.js` / `App.vue`。
@@ -76,7 +77,17 @@
 - **购物车**：`cart` 云对象应实现 `sync/get/clear` 三个方法，用于多端共享。同样提供了本地降级逻辑（`menuCartData` + `menuCartDataRemoteShadow`），保证即使离线也能继续下单。
 - **结算数据**：菜品列表、渠道、桌号等由点餐页写入 `dishData`，结算页读取后展示；结算表单结果通过 `checkoutProfile` 等 key 缓存，便于二次进入自动填充。
 - **优惠券/地址/发票**：当前为本地假数据，存储在 `couponList`、`userAddressList`、`invoiceInfo` 中，可替换为真实接口。
-- **订单/会员**：`pages/order`、`subPack/order/orderDetail` 与 `pages/my` 仍为静态渲染，作为 UI 模板，后续对接后端即可。
+- **订单/会员**：订单页仍以静态数据演示；“我的”页已对接 `member` 云对象，登录后会读取 `user_profile`、`coupon_template`、`coupon`、`point_goods` 等集合，并在本地缓存 `memberProfile`、`memberToken`，保证多次进入仍能展示真实会员信息。
+
+### AppID / AppSecret 统一管理
+- 根目录新增 `app.config.js`，集中维护微信小程序的 `appId` 与 `appSecret`，云对象（如 `auth`、`zhuohao`）会统一从该文件或 `WX_APP_ID / WX_APP_SECRET` 环境变量中读取，无需在多处重复修改。
+- 由于 `manifest.json`、`project.config.json` 等文件必须写入字面量，可在修改 `app.config.js` 后执行 `node scripts/sync-weapp-config.js` 一键同步。该脚本除了更新上述配置外，还会把 `uniCloud-aliyun/cloudfunctions/shared/app.config.js` 的内容复制到 `auth`、`zhuohao` 等云对象的 `shared/app.config.js` 子目录中，确保上传云函数时也能读取到相同的 AppID/AppSecret。
+- **上线切换 APPID checklist**  
+  1. 更新 `app.config.js` 中的 `weapp.appId` / `appSecret`；如需使用环境变量部署，可将 `WX_APP_ID/WX_APP_SECRET` 配置到对应空间的环境变量中。  
+  2. 运行 `node scripts/sync-weapp-config.js`，自动同步 `manifest.json` 与 `project.config.json` 的 `appid`。如有必要，将 `manifest.json` 的变更重新提交到版本库。  
+  3. 重新上传依赖 AppID 的云对象（如 `auth`、`zhuohao`、`paymentService` 等），它们都会从 `app.config.js` 或环境变量读取最新配置。  
+  4. 使用新的 AppID 到微信公众平台配置合法域名/服务器等信息，并在微信开发者工具中切换为该 AppID 运行或上传。  
+  5. 若脚本提示某文件已是最新版本，请确认你当前工作区的 `appId` 与目标一致即可，无需手动改动其他位置。
 
 ### 常用本地缓存 Key
 | Key | 用途 | 读写位置 |
@@ -129,3 +140,37 @@
   2. 在 “订单详情” 页面应出现“备餐进度”模块，默认状态为“备餐中”。  
   3. 可在 HBuilderX 右键 `kitchen` 云对象 → 运行云对象，执行 `updateStatus({ orderNo: 'ODxxxx', nextStatus: 'ready' })` / `updateStatus({... 'completed'})`，订单详情中的时间线将同步更新。  
   4. 若仅做本地模拟（未连接 uniCloud），`kitchenService` 会把工单缓存在本地，同样可以在订单详情看到进度。
+
+## 桌台与外卖场景（F11-F13）
+- **桌台管理（F11）**：添加 `restaurant_table`、`table_session` 集合与 `table` 云对象（`scanOpen/status/callService/release`）。首页扫码后会调用 `tableService.open` 生成会话；点餐页头部展示桌号/状态并支持“呼叫服务”“刷新状态”。
+- **排队与预约（F12）**：新增 `queue_ticket` 集合与 `queue` 云对象，首页提供取号与预约弹窗，`queueService.take/reserve` 支撑排队、统计等待桌数，本地离线也有模拟数据。
+- **外卖配送策略（F13）**：引入 `delivery_area` 集合与 `delivery` 云对象，结算页（外卖模式）会依据地址实时计算配送距离、起送价、打包费，`deliveryWarning` 会提醒用户未达配送条件并阻止支付。
+- **测试指南**  
+  1. **桌台**：在首页输入桌号并选择人数，确认后进入点餐页，顶部显示桌号与状态。点击“呼叫服务”可在云端 `table_session` 中看到 `call_service_logs`。  
+  2. **排队**：在首页点击“取号”填写人数，成功后可在 `queue_ticket` 集合查看待叫号列表，页面的“当前等待”会实时刷新。  
+  3. **外卖配送**：切换外卖并选择地址，结算页会展示“配送费/打包费”，若地址超范围或金额未达起送价，按钮会提示原因且无法支付；在 `delivery_area` 集合配置不同 radius/fee 即可模拟范围变化。
+
+## 会员与营销（F14-F17）
+- **登录与会员档案（F14）**：新增 `member` 云对象与 `user_profile` 集合，`pages/my/my.vue` 通过 `memberService.login` 获取昵称/头像/积分，未开通云端时可自动降级为本地会员。
+- **积分/等级体系（F15）**：维护 `member_level_rule`、`point_ledger`，支持每日签到（加积分）、等级权益展示以及积分流水；`member.signIn` 会校验当日是否已签到。
+- **优惠券中心（F16）**：`coupon` 云对象驱动 `coupon_template`、`coupon` 集合，首页结算页会实时拉取可用优惠券；“我的”页提供领取与查看入口，结算页会依据订单金额/渠道自动筛选可用券。
+- **积分商城（F17）**：`point_goods` 集合+`member.exchangeGoods` 支撑积分兑换，前端“我的”页展示可兑换商品并在成功后扣减积分。
+- **会员信息防覆盖**：老用户再次登录时，云端仅在档案缺失时才写入微信头像/昵称；前端默认头像为云空间静态图，可在 `pages/my/my.vue` 中替换。
+- **测试方法**  
+  1. 打开“我的”页，点击“登录”并授权头像昵称，可看到会员等级条/积分值；点击“签到 +10”验证积分累加。  
+  2. 在同一页面的“优惠券中心”领取一张券，再前往结算页确认优惠栏中出现对应的券，并能在金额满足门槛时选择使用。  
+  3. 在“积分商城”中兑换一件商品，返回顶部查看积分是否减少；同时在 `point_goods` 集合中可看到库存减 1。  
+  4. 若在无云端环境运行，上述操作会自动使用本地 mock 数据，保证流程可体验。
+  5. 体验优惠券中心的骨架屏/空态按钮：切换网络或短暂断开 uniCloud 时可看见 `u-loading` 占位，模板为空时会出现“立即去领取”/“去看看”按钮，可引导用户跳转运营活动。
+
+## 微信登录认证
+- **接口实现**：新增 `common/services/auth.js` 与 `uniCloud-aliyun/cloudfunctions/auth` 云对象，分别封装了 `wx.login -> code2Session`、`checkSessionKey`、`ResetUserSessionKey` 流程，后端遵循官方文档（`code2Session`、`checkSession`、`ResetUserSessionKey`）完成 openid/session_key 的下发与校验，并把 session 信息持久化到 `user_session` 集合。
+- **配置步骤**  
+  1. 在微信小程序管理后台获取 `AppID` 与 `AppSecret`，写入 `uniCloud-aliyun/cloudfunctions/auth/config.js`（或通过 `WX_APP_ID/WX_APP_SECRET` 环境变量注入）。  
+  2. 在 HBuilderX -> uniCloud 面板上传 `auth` 云对象，并在数据库中导入 `user_session.schema.json`。  
+  3. 微信开发者工具内运行小程序时，点击“我的”页 → “登录”触发 `uni.getUserProfile` + `wx.login`，前端会把 code 与用户信息传给 `auth.login`，再由 `member.login` 根据 openid 生成/更新会员档案。
+- **校验与调试**  
+  - 在真机或模拟器上完成一次登录后，可在 `user_session` 集合看到对应记录，字段 `expires_at` 表示 session_key 在后端缓存的过期时间。  
+  - 关闭小程序重新进入，`common/services/auth.js` 会优先使用本地缓存的 session 并在过期前自动刷新；若想验证接口，可在控制台执行 `uniCloud.importObject('auth').checkSession({ openid, sessionKey })` 或 `resetSession`，返回 `valid: true` 即表示与官方接口对接成功。  
+  - 登录后若用户未主动设置头像/昵称，前端会使用 `pages/my/my.vue` 中的 `defaultAvatar` 兜底；云端 `member.login` 会在用户已有头像/昵称时跳过覆盖，避免清缓存重登导致资料丢失。
+  - 如果尚未配置 `AppID/AppSecret` 或当前运行环境不支持 `wx.login`，服务会自动降级为本地 mock 登录，方便继续开发，但不会产生真实的 openid。上线前务必补齐密钥并在 README 的该段说明中打勾确认。

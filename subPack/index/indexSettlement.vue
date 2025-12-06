@@ -127,6 +127,10 @@
 				<text>￥{{feeDetail.payable.toFixed(2)}}</text>
 			</view>
 		</view>
+		<view v-if="cartChannel === 'takeout' && deliveryWarning" class="delivery-warning">
+			<u-icon name="warning-fill" size="28" color="#ff9f1a"></u-icon>
+			<text>{{deliveryWarning}}</text>
+		</view>
 
 		<u-gap height="100"></u-gap>
 
@@ -277,7 +281,10 @@
 import orderService from '@/common/services/order.js'
 import paymentService from '@/common/services/payment.js'
 import cartService from '@/common/services/cart.js'
+import deliveryService from '@/common/services/delivery.js'
 import kitchenService from '@/common/services/kitchen.js'
+import memberService from '@/common/services/member.js'
+import couponService from '@/common/services/coupon.js'
 
 	export default {
 		data() {
@@ -305,18 +312,9 @@ import kitchenService from '@/common/services/kitchen.js'
 					detail: ''
 				},
 				couponSheetShow: false,
-				couponList: [{
-					id: 'coupon_5',
-					title: '满50减5',
-					amount: 5,
-					threshold: 50
-				}, {
-					id: 'coupon_10',
-					title: '满99减10',
-					amount: 10,
-					threshold: 99
-				}],
+				couponList: [],
 				selectedCouponId: '',
+				couponLoading: false,
 				invoicePopup: false,
 				invoiceInfo: {
 					needInvoice: false,
@@ -331,6 +329,10 @@ import kitchenService from '@/common/services/kitchen.js'
 					discount: 0,
 					payable: 0
 				},
+				deliveryQuote: null,
+				deliveryLoading: false,
+				memberProfile: memberService.getStoredProfile() || null,
+				couponFetchTimer: null,
 				valueStyle: {
 					fontSize: '26rpx'
 				},
@@ -403,12 +405,27 @@ import kitchenService from '@/common/services/kitchen.js'
 			},
 			activeCoupon() {
 				return this.couponList.find(item => item.id === this.selectedCouponId) || null
+			},
+			deliveryWarning() {
+				if (this.cartChannel !== 'takeout') return ''
+				if (!this.deliveryQuote) return ''
+				if (!this.deliveryQuote.deliverable) {
+					return this.deliveryQuote.reason || '超出配送范围'
+				}
+				if (this.deliveryQuote.minAmount && this.feeDetail.goodsTotal < this.deliveryQuote.minAmount) {
+					return `未达起送价 ¥${this.deliveryQuote.minAmount}`
+				}
+				return ''
 			}
 		},
 		watch: {
 			orderList: {
 				handler() {
 					this.calcFeeDetail()
+					this.scheduleCouponFetch()
+					if (this.cartChannel === 'takeout') {
+						this.refreshDeliveryQuote()
+					}
 				},
 				deep: true
 			},
@@ -416,7 +433,12 @@ import kitchenService from '@/common/services/kitchen.js'
 				this.calcFeeDetail()
 			},
 			cartChannel() {
-				this.calcFeeDetail()
+				this.scheduleCouponFetch()
+				this.refreshDeliveryQuote()
+			},
+			selectedAddressId() {
+				this.refreshDeliveryQuote()
+				this.scheduleCouponFetch()
 			}
 		},
 		onLoad(param) {
@@ -455,8 +477,19 @@ import kitchenService from '@/common/services/kitchen.js'
 					this.tableInfo = res.data.tableInfo || null
 					this.restaurantName = res.data.restaurantName || '私房菜'
 					this.calcFeeDetail()
+					this.refreshDeliveryQuote()
 				}
 			})
+		},
+		onShow() {
+			const latest = memberService.getStoredProfile()
+			if (latest && latest.userId) {
+				const changed = !this.memberProfile || (this.memberProfile.userId !== latest.userId) || (this.memberProfile.points !== latest.points)
+				if (changed) {
+					this.memberProfile = latest
+					this.scheduleCouponFetch()
+				}
+			}
 		},
 		methods: {
 			noop() {},
@@ -473,8 +506,13 @@ import kitchenService from '@/common/services/kitchen.js'
 			},
 			calcFeeDetail() {
 				const goodsTotal = this.orderList.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.value || 0), 0)
-				const packageFee = this.cartChannel === 'takeout' ? this.orderNum * 1 : 0
-				const deliveryFee = this.cartChannel === 'takeout' ? 5 : 0
+				const quote = this.deliveryQuote
+				let packageFee = 0
+				let deliveryFee = 0
+				if (this.cartChannel === 'takeout') {
+					packageFee = quote && quote.packageFee !== undefined ? Number(quote.packageFee) : this.orderNum * 1
+					deliveryFee = quote && quote.deliveryFee !== undefined ? Number(quote.deliveryFee) : 5
+				}
 				let discount = 0
 				const coupon = this.activeCoupon
 				if (coupon && goodsTotal >= coupon.threshold) {
@@ -541,6 +579,73 @@ import kitchenService from '@/common/services/kitchen.js'
 						this.utensilsCount = res.tapIndex
 					}
 				})
+			},
+			scheduleCouponFetch() {
+				if (this.couponFetchTimer) {
+					clearTimeout(this.couponFetchTimer)
+					this.couponFetchTimer = null
+				}
+				this.couponFetchTimer = setTimeout(() => {
+					this.loadCoupons()
+				}, 150)
+			},
+			async loadCoupons() {
+				const profile = this.memberProfile || memberService.getStoredProfile()
+				if (!profile || !profile.userId) {
+					this.couponList = []
+					this.selectedCouponId = ''
+					return
+				}
+				const goodsTotal = this.orderList.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.value || 0), 0)
+				this.couponLoading = true
+				try {
+					const usable = await couponService.listUsable(profile.userId, goodsTotal, this.cartChannel)
+					this.couponList = (usable || []).map(item => ({
+						id: item._id || item.id,
+						title: item.title,
+						amount: item.amount,
+						threshold: item.threshold,
+						channel: item.channel_limit || 'all',
+						status: item.status
+					}))
+					if (!this.couponList.find(item => item.id === this.selectedCouponId)) {
+						this.selectedCouponId = ''
+					}
+				} catch (err) {
+					console.warn('load coupons failed', err)
+					this.couponList = []
+					this.selectedCouponId = ''
+				} finally {
+					this.couponLoading = false
+				}
+			},
+			async refreshDeliveryQuote() {
+				if (this.cartChannel !== 'takeout') {
+					this.deliveryQuote = null
+					this.calcFeeDetail()
+					return
+				}
+				const address = this.selectedAddress
+				if (!address) {
+					this.deliveryQuote = null
+					this.calcFeeDetail()
+					return
+				}
+				const goodsAmount = this.orderList.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.value || 0), 0)
+				this.deliveryLoading = true
+				try {
+					const quote = await deliveryService.quote({
+						address,
+						goodsAmount
+					})
+					this.deliveryQuote = quote
+				} catch (err) {
+					console.warn('delivery quote failed', err)
+					this.deliveryQuote = null
+				} finally {
+					this.deliveryLoading = false
+					this.calcFeeDetail()
+				}
 			},
 			openInvoicePopup() {
 				this.invoicePopup = true
@@ -646,6 +751,10 @@ import kitchenService from '@/common/services/kitchen.js'
 				}
 				if (this.cartChannel === 'takeout' && !this.selectedAddressId) {
 					this.$u.toast('请选择送餐地址')
+					return
+				}
+				if (this.cartChannel === 'takeout' && this.deliveryWarning) {
+					this.$u.toast(this.deliveryWarning)
 					return
 				}
 				const itemsSnapshot = this.buildOrderItemsSnapshot()
@@ -802,6 +911,18 @@ import kitchenService from '@/common/services/kitchen.js'
 		border-radius: 24rpx;
 		background-color: #fff;
 		box-shadow: 0 8rpx 30rpx rgba(0, 0, 0, 0.03);
+	}
+
+	.delivery-warning {
+		margin: 10rpx 30rpx 0;
+		padding: 16rpx 20rpx;
+		display: flex;
+		align-items: center;
+		gap: 12rpx;
+		background-color: #fff4e5;
+		border-radius: 16rpx;
+		color: #ff9f1a;
+		font-size: 24rpx;
 	}
 
 	.fee-row {
