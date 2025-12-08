@@ -8,6 +8,9 @@ const httpClient = uniCloud.httpclient
 const USER_COLLECTION = 'user_profile'
 const SESSION_COLLECTION = 'user_session'
 
+const DEFAULT_AVATAR_URL = 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/avatarurl.jpg'
+const DEFAULT_NICKNAME_PREFIX = '微信用户'
+
 const config = require('./config')
 const SESSION_GRACE_MS = 120 * 1000
 let accessTokenCache = {
@@ -126,22 +129,22 @@ async function upsertUserProfile({ openid, unionid, userInfo = {} }) {
 	if (profileRes.data && profileRes.data.length) {
 		const profile = profileRes.data[0]
 		await db.collection(USER_COLLECTION).doc(profile._id).update({
-			nickname: userInfo.nickname || userInfo.nickName || profile.nickname || '微信顾客',
-			avatar: userInfo.avatar || userInfo.avatarUrl || profile.avatar || '',
 			unionid: unionid || profile.unionid || '',
 			last_login_at: now,
 			updated_at: now
 		})
 		return profile._id
 	}
+	const rand = String(Math.floor(Math.random() * 1000000)).padStart(6, '0')
+	const nickname = `${DEFAULT_NICKNAME_PREFIX}${rand}`
 	const doc = {
 		openid,
 		unionid: unionid || '',
-		nickname: userInfo.nickname || userInfo.nickName || '微信顾客',
-		avatar: userInfo.avatar || userInfo.avatarUrl || '',
+		nickname,
+		avatar: DEFAULT_AVATAR_URL,
 		mobile: '',
 		level: 1,
-		points: 300,
+		points: 400,
 		experience: 0,
 		created_at: now,
 		updated_at: now,

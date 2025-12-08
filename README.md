@@ -155,7 +155,7 @@
 - **积分/等级体系（F15）**：维护 `member_level_rule`、`point_ledger`，支持每日签到（加积分）、等级权益展示以及积分流水；`member.signIn` 会校验当日是否已签到。
 - **优惠券中心（F16）**：`coupon` 云对象驱动 `coupon_template`、`coupon` 集合，首页结算页会实时拉取可用优惠券；“我的”页提供领取与查看入口，结算页会依据订单金额/渠道自动筛选可用券。
 - **积分商城（F17）**：`point_goods` 集合+`member.exchangeGoods` 支撑积分兑换，前端“我的”页展示可兑换商品并在成功后扣减积分。
-- **会员信息防覆盖**：老用户再次登录时，云端仅在档案缺失时才写入微信头像/昵称；前端默认头像为云空间静态图，可在 `pages/my/my.vue` 中替换。
+- **会员信息防覆盖**：老用户再次登录时，云端仅在档案缺失时才写入微信头像/昵称；首次建档时统一使用云空间静态头像 `https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/avatarurl.jpg` 与“微信用户 + 6位随机数”作为昵称，初始积分 400，与前端默认头像保持一致，需要换默认形象只需改该地址即可。
 - **测试方法**  
   1. 打开“我的”页，点击“登录”并授权头像昵称，可看到会员等级条/积分值；点击“签到 +10”验证积分累加。  
   2. 在同一页面的“优惠券中心”领取一张券，再前往结算页确认优惠栏中出现对应的券，并能在金额满足门槛时选择使用。  
@@ -172,5 +172,6 @@
 - **校验与调试**  
   - 在真机或模拟器上完成一次登录后，可在 `user_session` 集合看到对应记录，字段 `expires_at` 表示 session_key 在后端缓存的过期时间。  
   - 关闭小程序重新进入，`common/services/auth.js` 会优先使用本地缓存的 session 并在过期前自动刷新；若想验证接口，可在控制台执行 `uniCloud.importObject('auth').checkSession({ openid, sessionKey })` 或 `resetSession`，返回 `valid: true` 即表示与官方接口对接成功。  
-  - 登录后若用户未主动设置头像/昵称，前端会使用 `pages/my/my.vue` 中的 `defaultAvatar` 兜底；云端 `member.login` 会在用户已有头像/昵称时跳过覆盖，避免清缓存重登导致资料丢失。
+  - 登录后若用户未主动设置头像/昵称，前端会使用 `pages/my/my.vue` 中的 `defaultAvatar` 兜底；云端 `auth.login` 负责落库 openid 并赋予“微信用户 + 随机数”昵称与静态头像，`member.login` 会在资料存在时跳过覆盖，避免清缓存重登导致资料丢失。若需要变更默认头像或昵称格式，只需修改 `auth/index.obj.js` 中的常量并重新上传该云对象。
+  - 验证默认头像/昵称是否生效：先在 `user_profile` 中删除测试 openid，再清除小程序本地缓存，重新登录后应看到 `[member.login] create profile ...` 日志，数据库对应记录的 `nickname` 与 `avatar` 即为统一默认值。
   - 如果尚未配置 `AppID/AppSecret` 或当前运行环境不支持 `wx.login`，服务会自动降级为本地 mock 登录，方便继续开发，但不会产生真实的 openid。上线前务必补齐密钥并在 README 的该段说明中打勾确认。

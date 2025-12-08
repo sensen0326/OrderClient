@@ -8,6 +8,9 @@ const LEDGER_COLLECTION = 'point_ledger'
 const LEVEL_COLLECTION = 'member_level_rule'
 const GOODS_COLLECTION = 'point_goods'
 
+const DEFAULT_AVATAR_URL = 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/avatarurl.jpg'
+const DEFAULT_NICKNAME_PREFIX = '微信用户'
+
 const DEFAULT_LEVELS = [
 	{ level: 1, name: 'V1', require_points: 0, benefits: ['生日礼', '基础积分'] },
 	{ level: 2, name: 'V2', require_points: 200, benefits: ['95 折', '优先排队'] },
@@ -119,8 +122,8 @@ function normalizeProfile(doc) {
 module.exports = {
 	async login(payload = {}) {
 		await ensureLevelRules()
-		const nickname = payload.nickname || '微信顾客'
-		const openid = payload.openid || payload.unionid || payload.mobile || `guest_${nickname}_${Date.now()}`
+		const seedNickname = payload.nickname || DEFAULT_NICKNAME_PREFIX
+		const openid = payload.openid || payload.unionid || payload.mobile || `guest_${seedNickname}_${Date.now()}`
 		let profileRes = await db.collection(USER_COLLECTION).where({
 			openid
 		}).limit(1).get()
@@ -128,10 +131,12 @@ module.exports = {
 		const now = Date.now()
 		let isNew = false
 		if (!profileRes.data || !profileRes.data.length) {
+			const rand = String(Math.floor(Math.random() * 1000000)).padStart(6, '0')
+			const nickname = `${DEFAULT_NICKNAME_PREFIX}${rand}`
 			const doc = {
 				openid,
 				nickname,
-				avatar: payload.avatar || '',
+				avatar: DEFAULT_AVATAR_URL,
 				mobile: payload.mobile || '',
 				level: 1,
 				points: 400,
@@ -140,24 +145,16 @@ module.exports = {
 				updated_at: now,
 				last_login_at: now
 			}
+			console.log('[member.login] create profile', openid, nickname, DEFAULT_AVATAR_URL)
 			const addRes = await db.collection(USER_COLLECTION).add(doc)
 			profile = Object.assign({}, doc, { _id: addRes.id || addRes._id })
 			isNew = true
 		} else {
 			profile = profileRes.data[0]
-			const updateData = {
+			await db.collection(USER_COLLECTION).doc(profile._id).update({
 				last_login_at: now,
 				updated_at: now
-			}
-			if (!profile.nickname && nickname) {
-				updateData.nickname = nickname
-				profile.nickname = nickname
-			}
-			if (!profile.avatar && payload.avatar) {
-				updateData.avatar = payload.avatar
-				profile.avatar = payload.avatar
-			}
-			await db.collection(USER_COLLECTION).doc(profile._id).update(updateData)
+			})
 			profile.last_login_at = now
 		}
 		const token = `tk_${profile._id}_${Date.now()}`

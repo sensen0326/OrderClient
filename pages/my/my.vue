@@ -1,11 +1,11 @@
-<template>
+﻿<template>
 	<view class="my-wrap">
 		<view class="header">
 			<view class="header__bg"></view>
 			<view class="header__card">
 				<view class="header__info">
 					<view class="header__name">{{ isLoggedIn ? (userProfile.nickname || '会员') : '登录解锁更多权益' }}</view>
-					<view class="header__hint">{{ isLoggedIn ? '欢迎回来，点点美味继续享' : '新用户注册立得积分好礼' }}</view>
+					<view class="header__hint">{{ isLoggedIn ? '' : '新用户注册立得积分好礼' }}</view>
 					<view class="header__level" v-if="isLoggedIn">
 						<u-tag :text="userProfile.level_name || 'V0'" mode="plain" border-color="#EE2F37" color="#EE2F37" size="mini" shape="circle" />
 						<text class="header__vip-desc" v-if="userProfile.next_level_need">
@@ -212,22 +212,7 @@ export default {
 					userInfo
 				})
 				const profile = result && result.profile ? result.profile : result
-				let finalProfile = this.withDefaultAvatar(profile)
-				if (result && result.isNew && userInfo) {
-					try {
-						const updated = await memberService.updateProfile({
-							userId: finalProfile.userId,
-							nickname: userInfo.nickName,
-							avatar: userInfo.avatarUrl
-						})
-						if (updated) {
-							finalProfile = this.withDefaultAvatar(updated)
-						}
-					} catch (err) {
-						console.warn('sync profile failed', err)
-					}
-				}
-				this.userProfile = finalProfile
+				this.userProfile = this.withDefaultAvatar(profile)
 				this.isLoggedIn = true
 				this.$u.toast('登录成功')
 				this.initMemberData()
