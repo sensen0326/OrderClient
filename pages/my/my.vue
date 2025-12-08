@@ -13,12 +13,6 @@
 						</text>
 					</view>
 					<u-line-progress v-if="isLoggedIn" active-color="#EE2F37" :percent="userProfile.level_progress || 0" />
-					<view class="header__points">
-						<view>
-							<text class="label">{{ isLoggedIn ? '积分' : '期待你的加入' }}</text>
-							<text class="value" :class="{ placeholder: !isLoggedIn }">{{ isLoggedIn ? (userProfile.points || 0) : '' }}</text>
-						</view>
-					</view>
 					<view class="header__phone" v-if="isLoggedIn">
 						<text class="label">手机号码</text>
 						<text class="value" v-if="userProfile.mobile">{{ userProfile.mobile }}</text>
@@ -38,6 +32,29 @@
 					<u-avatar :src="userProfile.avatar || defaultAvatar" size="160" />
 					<u-button v-if="!isLoggedIn" size="mini" type="primary" @click="handleLogin">登录</u-button>
 					<u-button v-else size="mini" plain @click="openProfileEditor">编辑资料</u-button>
+				</view>
+			</view>
+		</view>
+
+		<view class="points-card" v-if="isLoggedIn">
+			<view class="points-card__header">
+				<view>
+					<view class="points-card__label">我的积分</view>
+					<view class="points-card__value">{{ userProfile.points || 0 }}</view>
+				</view>
+				<u-button size="mini" type="primary" plain @click="goPointLedger">查看明细</u-button>
+			</view>
+			<view class="points-card__progress" v-if="userProfile.next_level_need">
+				<text class="points-card__progress-text">距 {{ userProfile.next_level_name || '下一级' }} 还差 {{ userProfile.next_level_need }} 积分</text>
+				<u-line-progress :percent="userProfile.level_progress || 0" height="10" active-color="#EE2F37" background-color="#ffd9da" />
+			</view>
+			<view class="points-card__footer">
+				<view class="points-card__item">
+					<text class="points-card__item-label">最近变化</text>
+					<view class="points-card__chip">
+						<text class="points-card__chip-change">{{ lastLedgerValue }}</text>
+						<text class="points-card__chip-time">{{ lastLedgerTime }}</text>
+					</view>
 				</view>
 			</view>
 		</view>
@@ -159,6 +176,8 @@ export default {
 			couponTemplates: [],
 			myCoupons: [],
 			pointGoods: [],
+			levelRules: [],
+			pointLedger: [],
 			phoneAuthLoading: false,
 			serviceList: [
 				{ icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/icon-1.png', text: '积分签到' },
@@ -178,6 +197,24 @@ export default {
 	onShow() {
 		this.initMemberData()
 	},
+	computed: {
+		pointLedgerSummary() {
+			if (!this.pointLedger.length) return '暂无记录'
+			const record = this.pointLedger[0]
+			const change = record.change > 0 ? `+${record.change}` : record.change
+			return `${change}`
+		},
+		lastLedgerValue() {
+			if (!this.pointLedger.length) return '--'
+			const record = this.pointLedger[0]
+			return record.change > 0 ? `+${record.change}` : `${record.change}`
+		},
+		lastLedgerTime() {
+			if (!this.pointLedger.length) return '--'
+			const record = this.pointLedger[0]
+			return this.formatRecordTime(record.created_at)
+		}
+	},
 	methods: {
 		withDefaultAvatar(profile = {}) {
 			if (!profile) return profile
@@ -185,14 +222,20 @@ export default {
 		},
 		async initMemberData() {
 			try {
+				await this.loadLevelRules()
 				const profile = await memberService.fetchProfile()
 				if (profile) {
 					this.userProfile = this.withDefaultAvatar(profile)
 					this.isLoggedIn = true
 					this.ensureProfileInfo()
+					this.loadPointLedger()
+				} else {
+					this.isLoggedIn = false
+					this.pointLedger = []
 				}
 			} catch (err) {
 				console.warn('fetch profile failed', err)
+				this.pointLedger = []
 			}
 			this.loadPointGoods()
 			this.refreshCoupons()
@@ -216,6 +259,7 @@ export default {
 				this.isLoggedIn = true
 				this.$u.toast('登录成功')
 				this.initMemberData()
+				this.loadPointLedger()
 				if ((result && result.isNew) || !profile.avatar || !profile.nickname) {
 					this.prepareProfileForm(profile)
 					this.showProfileModal = true
@@ -236,6 +280,7 @@ export default {
 				if (res && res.profile) {
 					this.userProfile = this.withDefaultAvatar(res.profile)
 				}
+				this.loadPointLedger()
 				this.$u.toast('签到成功')
 			} catch (err) {
 				this.$u.toast(err.message || '今日已签到')
@@ -274,6 +319,27 @@ export default {
 				this.$u.toast(err.message || '绑定失败')
 			} finally {
 				this.phoneAuthLoading = false
+			}
+		},
+		async loadLevelRules() {
+			try {
+				const rules = await memberService.getLevelRules()
+				this.levelRules = rules || []
+			} catch (err) {
+				console.warn('load level rules failed', err)
+				this.levelRules = []
+			}
+		},
+		async loadPointLedger() {
+			if (!this.isLoggedIn) {
+				this.pointLedger = []
+				return
+			}
+			try {
+				this.pointLedger = await memberService.fetchPointLedger(10)
+			} catch (err) {
+				console.warn('load ledger failed', err)
+				this.pointLedger = []
 			}
 		},
 		async loadPointGoods() {
@@ -329,6 +395,9 @@ export default {
 				if (res && res.profile) {
 					this.userProfile = this.withDefaultAvatar(res.profile)
 				}
+				if (res && res.pointOrder) {
+					this.loadPointLedger()
+				}
 				this.$u.toast('兑换成功')
 			} catch (err) {
 				this.$u.toast(err.message || '兑换失败')
@@ -344,6 +413,30 @@ export default {
 			} else {
 				this.$u.toast(`${name} 敬请期待`)
 			}
+		},
+		goPointLedger() {
+			if (!this.isLoggedIn) {
+				this.$u.toast('请先登录')
+				return
+			}
+			uni.navigateTo({
+				url: '/subPack/member/pointLedger'
+			})
+		},
+		formatPointStatus(status) {
+			const map = {
+				pending: '待处理',
+				processing: '处理中',
+				completed: '已完成',
+				cancelled: '已取消'
+			}
+			return map[status] || '处理中'
+		},
+		formatRecordTime(ts) {
+			if (!ts) return ''
+			const date = new Date(ts)
+			const pad = n => String(n).padStart(2, '0')
+			return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 		},
 		prepareProfileForm(profile) {
 			this.profileForm = {
@@ -654,6 +747,86 @@ async function listCouponTemplates() {
 	}
 }
 
+.points-card {
+	margin: -40rpx 30rpx 20rpx;
+	padding: 30rpx;
+	background: #fff;
+	border-radius: 20rpx;
+	box-shadow: 0 10rpx 30rpx rgba(238, 47, 55, 0.15);
+
+	&__header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 20rpx;
+	}
+
+	&__label {
+		font-size: 26rpx;
+		color: #909399;
+	}
+
+	&__value {
+		font-size: 52rpx;
+		font-weight: bold;
+		color: #ee2f37;
+	}
+
+	&__progress {
+		margin-bottom: 20rpx;
+
+		&-text {
+			display: block;
+			font-size: 24rpx;
+			color: #909399;
+			margin-bottom: 8rpx;
+		}
+	}
+
+	&__footer {
+		margin-top: 20rpx;
+		background: linear-gradient(90deg, rgba(238, 47, 55, 0.08), rgba(238, 47, 55, 0.02));
+		border-radius: 14rpx;
+		padding: 20rpx;
+	}
+
+	&__item {
+		display: flex;
+		align-items: center;
+		gap: 16rpx;
+	}
+
+	&__item-label {
+		font-size: 26rpx;
+		color: #606266;
+		font-weight: 500;
+		min-width: 120rpx;
+	}
+	&__chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 16rpx;
+		background: #fff;
+		border-radius: 999rpx;
+		padding: 10rpx 28rpx;
+		border: 1px solid rgba(238, 47, 55, 0.2);
+		box-shadow: 0 6rpx 16rpx rgba(238, 47, 55, 0.1);
+		margin-left: 30rpx;
+	}
+
+	&__chip-change {
+		font-size: 36rpx;
+		font-weight: 600;
+		color: #303133;
+	}
+
+	&__chip-time {
+		font-size: 24rpx;
+		color: #909399;
+	}
+
+}
+
 .point-goods {
 	margin: 20rpx 30rpx;
 	padding: 30rpx;
@@ -718,6 +891,7 @@ async function listCouponTemplates() {
 	border-radius: 20rpx;
 	overflow: hidden;
 	box-shadow: 0 10rpx 20rpx rgba(0, 0, 0, 0.03);
+
 }
 
 .profile-modal {

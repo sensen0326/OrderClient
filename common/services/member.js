@@ -5,6 +5,21 @@ const hasUni = typeof uni !== 'undefined'
 
 const PROFILE_KEY = 'memberProfile'
 const TOKEN_KEY = 'memberToken'
+const LEDGER_KEY = 'memberPointLedgerMock'
+const ORDER_KEY = 'memberPointOrdersMock'
+
+const LOCAL_LEVEL_RULES = [
+	{ level: 1, name: 'V1', require_points: 0, benefits: ['生日礼遇', '积分入门'] },
+	{ level: 2, name: 'V2', require_points: 200, benefits: ['95折', '优先排队'] },
+	{ level: 3, name: 'V3', require_points: 600, benefits: ['免配送费', '专属客服'] }
+]
+
+const LOCAL_POINT_RULES = [
+	{ event: 'daily_sign', name: '每日签到', description: '每天首次签到 +10 积分', calc_type: 'fixed', value: 10 },
+	{ event: 'order_pay', name: '下单消费', description: '每消费 1 元获 1 积分', calc_type: 'ratio', ratio: 1 },
+	{ event: 'review_post', name: '评价奖励', description: '每日前 3 条评价各 +20 积分', calc_type: 'fixed', value: 20 },
+	{ event: 'invite_friend', name: '邀请好友', description: '成功邀请好友注册 +50 积分', calc_type: 'fixed', value: 50 }
+]
 
 const getMemberObject = (() => {
 	let instance = null
@@ -50,6 +65,44 @@ function saveProfile(profile, token) {
 	} catch (err) {
 		console.warn('saveProfile failed', err)
 	}
+}
+
+function getMockLedger() {
+	const list = []
+	const now = Date.now()
+	for (let i = 0; i < 8; i += 1) {
+		list.push({
+			_id: `ledger_${i}`,
+			change: i % 2 === 0 ? 10 : -20,
+			balance: 500 - i * 5,
+			event: i % 2 === 0 ? 'daily_sign' : 'exchange_goods',
+			remark: i % 2 === 0 ? '每日签到' : '兑换礼品',
+			created_at: now - i * 3600 * 1000
+		})
+	}
+	return list
+}
+
+function getMockPointOrders() {
+	const now = Date.now()
+	return [
+		{
+			orderId: 'mock_order_1',
+			goods_name: '精品茶歇券',
+			goods_cover: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/points/goods-tea.jpg',
+			status: 'pending',
+			cost_points: 300,
+			created_at: now - 3600 * 1000
+		},
+		{
+			orderId: 'mock_order_2',
+			goods_name: '甄选饮品券',
+			goods_cover: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/points/goods-coupon.jpg',
+			status: 'completed',
+			cost_points: 200,
+			created_at: now - 3600 * 5 * 1000
+		}
+	]
 }
 
 async function login(payload = {}) {
@@ -207,7 +260,8 @@ async function exchangeGoods(goodsId) {
 	const updated = res.profile || profile
 	saveProfile(updated, getStoredToken())
 	return {
-		profile: updated
+		profile: updated,
+		pointOrder: res.pointOrder
 	}
 }
 
@@ -236,6 +290,78 @@ async function updateProfile(payload = {}) {
 	return profile
 }
 
+async function getLevelRules() {
+	const memberObj = getMemberObject()
+	if (!memberObj) {
+		return LOCAL_LEVEL_RULES
+	}
+	try {
+		const res = await memberObj.levelRules()
+		return (res && res.list) || LOCAL_LEVEL_RULES
+	} catch (err) {
+		console.warn('getLevelRules failed', err)
+		return LOCAL_LEVEL_RULES
+	}
+}
+
+async function fetchPointLedger(limit = 20) {
+	const profile = getStoredProfile()
+	if (!profile || !profile.userId) return []
+	const memberObj = getMemberObject()
+	if (!memberObj) {
+		if (hasUni) {
+			const cached = uni.getStorageSync(LEDGER_KEY)
+			if (cached && cached.length) return cached
+			uni.setStorageSync(LEDGER_KEY, getMockLedger())
+			return getMockLedger()
+		}
+		return getMockLedger()
+	}
+	try {
+		const res = await memberObj.pointLedger({
+			userId: profile.userId,
+			limit
+		})
+		return (res && res.list) || []
+	} catch (err) {
+		console.warn('fetchPointLedger failed', err)
+		return []
+	}
+}
+
+async function listPointOrders(limit = 10) {
+	const profile = getStoredProfile()
+	if (!profile || !profile.userId) return []
+	const memberObj = getMemberObject()
+	if (!memberObj) {
+		return getMockPointOrders()
+	}
+	try {
+		const res = await memberObj.pointOrders({
+			userId: profile.userId,
+			limit
+		})
+		return (res && res.list) || []
+	} catch (err) {
+		console.warn('listPointOrders failed', err)
+		return []
+	}
+}
+
+async function getPointRules() {
+	const memberObj = getMemberObject()
+	if (!memberObj) {
+		return LOCAL_POINT_RULES
+	}
+	try {
+		const res = await memberObj.pointRules()
+		return (res && res.list) || LOCAL_POINT_RULES
+	} catch (err) {
+		console.warn('getPointRules failed', err)
+		return LOCAL_POINT_RULES
+	}
+}
+
 export default {
 	login,
 	fetchProfile,
@@ -245,5 +371,9 @@ export default {
 	listPointGoods,
 	exchangeGoods,
 	saveProfile,
-	updateProfile
+	updateProfile,
+	getLevelRules,
+	fetchPointLedger,
+	listPointOrders,
+	getPointRules
 }

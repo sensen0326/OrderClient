@@ -70,6 +70,13 @@
 				"style": {
 					"navigationBarTitleText": "订单详情"
 				}
+			},
+			{
+				"path": "member/pointLedger",
+				"style": {
+					"navigationBarTitleText": "积分流水",
+					"enablePullDownRefresh": false
+				}
 			}
 		]
 	}],
