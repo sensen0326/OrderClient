@@ -2,7 +2,13 @@
 	<view>
 		<!-- header start -->
 		<view>
-			<u-swiper :list="bannerList" mode="rect" height="700" border-radius="0"></u-swiper>
+			<u-swiper
+				:list="bannerSwiperList"
+				mode="rect"
+				height="700"
+				border-radius="0"
+				@click="handleBannerTap"
+			></u-swiper>
 		</view>
 		<!-- header end -->
 
@@ -26,13 +32,9 @@
 		<!-- body start -->
 		<view class="body">
 			<u-grid :col="2" :border="false">
-				<u-grid-item @click="orderFood(0)">
-					<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/service.jpg" width="150" height="150"></u-image>
-					<view class="body__text">门店堂食</view>
-				</u-grid-item>
-				<u-grid-item @click="orderFood(1)">
-					<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/takeaway.jpg" width="150" height="150"></u-image>
-					<view class="body__text">外卖配送</view>
+				<u-grid-item v-for="item in entryCardList" :key="item.title" @click="handleEntryAction(item)">
+					<u-image :src="item.image" width="150" height="150"></u-image>
+					<view class="body__text">{{ item.title }}</view>
 				</u-grid-item>
 			</u-grid>
 		</view>
@@ -68,13 +70,14 @@
 		</view>
 
 		<!-- integral start -->
-		<view class="integral">
+		<view class="integral" v-if="integralCard">
 			<view>
-				<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/integral.jpg" width="200" height="200"></u-image>
+				<u-image :src="integralCard.image" width="200" height="200"></u-image>
 			</view>
 			<view>
-				<view class="integral__nav">我的积分：<text>777</text></view>
-				<view class="integral__desc">可兑换现金优惠券和周边礼品</view>
+				<view class="integral__nav">{{ integralCard.title }}</view>
+				<view class="integral__desc">{{ integralCard.desc }}</view>
+				<u-button size="mini" plain type="primary" @click="handleOperationAction(integralCard, 'campaign')">查看详情</u-button>
 			</view>
 		</view>
 		<!-- integral end -->
@@ -105,20 +108,10 @@
 		<!-- grids -->
 		<view>
 			<u-grid :col="3" :border="false">
-				<u-grid-item>
-					<view class="grid-text">积分商城</view>
-					<view class="grid-desc">好多神秘好礼等你</view>
-					<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/integralShop.png" width="120" height="120"></u-image>
-				</u-grid-item>
-				<u-grid-item>
-					<view class="grid-text">会员中心</view>
-					<view class="grid-desc">享受会员的专属权益</view>
-					<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/vipCenter.png" width="120" height="120"></u-image>
-				</u-grid-item>
-				<u-grid-item>
-					<view class="grid-text">活动中心</view>
-					<view class="grid-desc">更多活动等你参加</view>
-					<u-image src="https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/activityCenter.png" width="120" height="120"></u-image>
+				<u-grid-item v-for="card in guideCardList" :key="card.title" @click="handleCardClick(card)">
+					<view class="grid-text">{{ card.title }}</view>
+					<view class="grid-desc">{{ card.desc }}</view>
+					<u-image :src="card.image" width="120" height="120"></u-image>
 				</u-grid-item>
 			</u-grid>
 		</view>
@@ -220,11 +213,59 @@
 import dishService from '@/common/services/dish.js'
 import tableService from '@/common/services/table.js'
 import queueService from '@/common/services/queue.js'
+import operationService from '@/common/services/operation.js'
+import analyticsService from '@/common/services/analytics.js'
 
 export default {
 	data() {
 		return {
-			bannerList: ['https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/banner.jpg'],
+			defaultBanners: [
+				{
+					title: '安心材料，品质火锅',
+					image: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/banner.jpg',
+					action: 'tab',
+					target: '/pages/menu/menu'
+				}
+			],
+			defaultEntries: [
+				{
+					title: '门店堂食',
+					image: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/service.jpg',
+					action: 'dine_in'
+				},
+				{
+					title: '外卖配送',
+					image: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/takeaway.jpg',
+					action: 'takeout'
+				}
+			],
+			defaultGuideCards: [
+				{
+					title: '积分商城',
+					desc: '好多神秘好礼等你',
+					image: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/integralShop.png',
+					action: 'page',
+					target: '/pages/my/my'
+				},
+				{
+					title: '会员中心',
+					desc: '享受会员的专属权益',
+					image: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/vipCenter.png',
+					action: 'page',
+					target: '/pages/my/my'
+				},
+				{
+					title: '活动中心',
+					desc: '更多活动等你参加',
+					image: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/activityCenter.png',
+					action: 'tab',
+					target: '/pages/menu/menu'
+				}
+			],
+			operationBanners: [],
+			operationEntries: [],
+			operationCards: [],
+			operationCampaigns: [],
 			searchKeyword: '',
 			recommendList: [],
 			showTableDialog: false,
@@ -261,12 +302,42 @@ export default {
 		if (this.tableInfo && this.tableInfo.tableNo) {
 			this.fetchTableStatus()
 		}
+		analyticsService.track('page_view', {
+			page: 'home'
+		})
 	},
 	onShow() {
 		this.loadRecommend()
 		this.fetchQueueStats()
+		this.loadOperationSlots()
 	},
 	computed: {
+		bannerSourceList() {
+			return this.operationBanners.length ? this.operationBanners : this.defaultBanners
+		},
+		bannerSwiperList() {
+			return this.bannerSourceList.map(item => ({
+				image: item.image,
+				title: item.title
+			}))
+		},
+		entryCardList() {
+			return this.operationEntries.length ? this.operationEntries : this.defaultEntries
+		},
+		guideCardList() {
+			return this.operationCards.length ? this.operationCards : this.defaultGuideCards
+		},
+		integralCard() {
+			const list = this.operationCampaigns.length ? this.operationCampaigns : []
+			if (list.length) return list[0]
+			return {
+				title: '积分加油站',
+				desc: '可兑换现金优惠券和周边礼品',
+				image: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/index/integral.jpg',
+				action: 'page',
+				target: '/pages/my/my'
+			}
+		},
 		tableStatusText() {
 			if (!this.tableInfo) return '未绑定'
 			switch (this.tableInfo.status) {
@@ -281,6 +352,21 @@ export default {
 		}
 	},
 	methods: {
+		async loadOperationSlots() {
+			try {
+				const slots = await operationService.fetchSlots(['home_banner', 'home_entry', 'home_cards', 'home_campaign'])
+				this.operationBanners = (slots.home_banner && slots.home_banner.items) || []
+				this.operationEntries = (slots.home_entry && slots.home_entry.items) || []
+				this.operationCards = (slots.home_cards && slots.home_cards.items) || []
+				this.operationCampaigns = (slots.home_campaign && slots.home_campaign.items) || []
+			} catch (err) {
+				console.warn('load operation slots failed', err)
+				this.operationBanners = []
+				this.operationEntries = []
+				this.operationCards = []
+				this.operationCampaigns = []
+			}
+		},
 		async loadRecommend() {
 			try {
 				const list = await dishService.listRecommend({
@@ -314,6 +400,9 @@ export default {
 		},
 		orderFood(tabIndex) {
 			uni.setStorageSync('subCurrent', tabIndex)
+			analyticsService.track('order_entry_click', {
+				channel: tabIndex === 0 ? 'dine_in' : 'takeout'
+			})
 			if (this.isSwitching) return
 			this.isSwitching = true
 			uni.switchTab({
@@ -330,6 +419,10 @@ export default {
 				return
 			}
 			uni.setStorageSync('menuSearchKeyword', keyword)
+			analyticsService.track('search', {
+				page: 'home',
+				keyword
+			})
 			this.orderFood(0)
 		},
 		handleSearchInput(e) {
@@ -342,7 +435,61 @@ export default {
 				dishId: dish._id,
 				categoryId: dish.category_id
 			})
+			analyticsService.track('recommend_click', {
+				dishId: dish._id,
+				name: dish.name
+			})
 			this.orderFood(0)
+		},
+		handleBannerTap(e) {
+			const index = typeof e === 'number' ? e : (e && e.detail ? e.detail.current : 0)
+			const banner = this.bannerSourceList[index]
+			this.handleOperationAction(banner, 'banner')
+		},
+		handleEntryAction(item) {
+			this.handleOperationAction(item, 'entry')
+		},
+		handleCardClick(item) {
+			this.handleOperationAction(item, 'card')
+		},
+		handleOperationAction(item = {}, source = 'slot') {
+			if (!item) return
+			analyticsService.track('operation_click', {
+				source,
+				title: item.title,
+				action: item.action,
+				target: item.target
+			})
+			const action = item.action || 'tab'
+			if (action === 'dine_in') {
+				this.orderFood(0)
+				return
+			}
+			if (action === 'takeout') {
+				this.orderFood(1)
+				return
+			}
+			if (action === 'tab') {
+				if (item.target) {
+					uni.switchTab({
+						url: item.target
+					})
+				}
+				return
+			}
+			if (action === 'page') {
+				if (item.target) {
+					uni.navigateTo({
+						url: item.target
+					})
+				}
+				return
+			}
+			if (action === 'url' && item.target) {
+				uni.navigateTo({
+					url: item.target
+				})
+			}
 		},
 		selectPeople(val) {
 			this.selectedPeople = val

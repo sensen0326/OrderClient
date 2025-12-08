@@ -2,36 +2,46 @@
 	<view class="u-wrap">
 		<!-- header start -->
 		<view class="header">
-			<view v-if="subCurrent">
-				<view class="header__title">北京市朝阳区万豪公寓7号楼1单元1201</view>
-				<view class="header__info">
-					<text class="header__name">Kaiyuan_Q</text>
-					<text>188****8888</text>
+			<view class="header__address">
+				<view class="header__address-info">
+					<view v-if="subCurrent">
+						<view class="header__main">
+							<text class="header__title header__title--single">北京市朝阳区万豪公寓7号楼1单元1201</text>
+						</view>
+						<view class="header__sub">
+							<text class="header__name">Kaiyuan_Q</text>
+							<text>188****8888</text>
+						</view>
+					</view>
+					<view v-else>
+						<view class="header__main">
+							<text class="header__title">北京市朝阳区万达广场4层·私房菜</text>
+						</view>
+					</view>
 				</view>
-			</view>
-			<view v-else>
-				<view class="header__title">北京市朝阳区万达广场4层·私房菜</view>
-				<view class="header__info">距离您 0.2km</view>
-			</view>
-			<view>
-				<u-subsection
-					:list="subList"
-					:current="subCurrent"
-					active-color="#EE2F37"
-					mode="subsection"
-					height="50"
-					:bold="false"
-					@change="subChange"
-				></u-subsection>
+				<view class="header__address-tabs">
+					<view class="order-mode-tabs order-mode-tabs--compact">
+						<view
+							v-for="(item,index) in subList"
+							:key="item.name"
+							class="order-mode-tabs__item"
+							:class="{'is-active': subCurrent === index}"
+							@click="subChange(index)"
+						>
+							{{ item.name }}
+						</view>
+					</view>
+				</view>
 			</view>
 			<view v-if="!subCurrent" class="table-quick-panel">
 				<view class="table-quick-panel__info">
-					<text>桌号 {{ tableInfo && tableInfo.tableNo ? tableInfo.tableNo : '未绑定' }}</text>
+					<text class="table-quick-panel__label">桌号</text>
+					<text class="table-quick-panel__value">{{ tableInfo && tableInfo.tableNo ? tableInfo.tableNo : '未绑定' }}</text>
 					<text class="table-quick-panel__status">{{ tableStatusText }}</text>
 				</view>
 				<view class="table-quick-panel__actions">
-					<u-button size="mini" type="primary" @click="callWaiter">呼叫服务</u-button>
-					<u-button size="mini" plain @click="refreshTableInfo">刷新</u-button>
+					<u-button class="table-quick-panel__btn" size="mini" type="primary" @click="callWaiter">呼叫服务</u-button>
+					<u-button class="table-quick-panel__btn" size="mini" plain @click="refreshTableInfo">刷新</u-button>
 				</view>
 			</view>
 		</view>
@@ -377,7 +387,6 @@
 	import dishService from '@/common/services/dish.js'
 	import cartService from '@/common/services/cart.js'
 	import tableService from '@/common/services/table.js'
-
 	export default {
 		data() {
 			return {
@@ -1230,22 +1239,66 @@
 
 	.header {
 		display: flex;
-		justify-content: space-between;
-		padding: 30rpx;
+		flex-direction: column;
+		gap: 12rpx;
+		padding: 18rpx 20rpx 8rpx;
+		background: #fff;
+
+		&__address {
+			border-radius: 12rpx;
+			padding: 10rpx 12rpx;
+			background: #fdfdfd;
+			box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.03);
+			display: flex;
+			align-items: flex-start;
+			justify-content: space-between;
+			gap: 16rpx;
+		}
+
+		&__address-info {
+			flex: 1;
+		}
+
+		&__address-tabs {
+			flex-shrink: 0;
+		}
+
+		&__main {
+			display: flex;
+			align-items: center;
+			gap: 12rpx;
+		}
 
 		&__title {
 			font-weight: bold;
-			font-size: 30rpx;
+			font-size: 28rpx;
+			color: #303133;
+			flex: 1;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+
+			&--single {
+				flex: 1;
+			}
 		}
 
-		&__info {
-			font-size: 24rpx;
-			color: $u-type-info;
-			margin-top: 15rpx;
+		&__distance {
+			font-size: 22rpx;
+			color: #909399;
+		}
+
+		&__sub {
+			margin-top: 6rpx;
+			font-size: 22rpx;
+			color: #909399;
+			display: flex;
+			align-items: center;
+			gap: 12rpx;
 		}
 
 		&__name {
-			margin-right: 15rpx;
+			margin-right: 8rpx;
 		}
 	}
 
@@ -1415,31 +1468,89 @@
 		padding-bottom: 220rpx;
 	}
 
-	.table-quick-panel {
-		margin-top: 20rpx;
-		padding: 20rpx;
-		background-color: #fff7f5;
-		border-radius: 16rpx;
+	.order-mode-tabs {
 		display: flex;
-		justify-content: space-between;
+		gap: 12rpx;
+		background: #fdf0ef;
+		padding: 8rpx;
+		border-radius: 30rpx;
+		align-self: flex-start;
+
+		&--compact {
+			padding: 4rpx 6rpx;
+			gap: 8rpx;
+
+			.order-mode-tabs__item {
+				min-width: 110rpx;
+				padding: 10rpx 16rpx;
+				font-size: 24rpx;
+			}
+		}
+
+		&__item {
+			min-width: 140rpx;
+			text-align: center;
+			padding: 14rpx 20rpx;
+			border-radius: 26rpx;
+			font-size: 26rpx;
+			color: #909399;
+			transition: all 0.2s;
+
+			&.is-active {
+				background: #fff;
+				color: #ee2f37;
+				font-weight: 600;
+				box-shadow: 0 6rpx 12rpx rgba(238, 47, 55, 0.15);
+			}
+		}
+	}
+
+	.table-quick-panel {
+		margin-top: 12rpx;
+		padding: 14rpx 18rpx;
+		background-color: #fff8f6;
+		border-radius: 12rpx;
+		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
+		gap: 12rpx;
+		width: 100%;
 
 		&__info {
 			display: flex;
-			flex-direction: column;
-			font-size: 28rpx;
+			align-items: baseline;
+			gap: 12rpx;
+			font-size: 24rpx;
+			color: #606266;
+			flex: 1;
+			min-width: 320rpx;
+		}
+
+		&__label {
+			color: #909399;
+		}
+
+		&__value {
+			font-size: 32rpx;
+			font-weight: bold;
 			color: #303133;
 		}
 
 		&__status {
 			font-size: 24rpx;
 			color: #ee2f37;
-			margin-top: 4rpx;
 		}
 
 		&__actions {
 			display: flex;
-			gap: 16rpx;
+			gap: 10rpx;
+			flex: 1;
+			justify-content: flex-end;
+			min-width: 280rpx;
+		}
+
+		&__btn {
+			flex: 1;
 		}
 	}
 

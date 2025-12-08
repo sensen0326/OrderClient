@@ -1,0 +1,74 @@
+{
+	"bsonType": "object",
+	"required": ["slot_code", "status"],
+	"permission": {
+		"read": true,
+		"create": false,
+		"update": false,
+		"delete": false
+	},
+	"properties": {
+		"_id": {
+			"description": "记录 ID"
+		},
+		"slot_code": {
+			"bsonType": "string",
+			"description": "运营位编码，如 home_banner"
+		},
+		"title": {
+			"bsonType": "string",
+			"description": "运营位标题"
+		},
+		"items": {
+			"bsonType": "array",
+			"description": "配置内容列表",
+			"items": {
+				"bsonType": "object",
+				"properties": {
+					"title": {
+						"bsonType": "string"
+					},
+					"desc": {
+						"bsonType": "string"
+					},
+					"image": {
+						"bsonType": "string"
+					},
+					"action": {
+						"bsonType": "string",
+						"description": "动作类型，如 page/tab/url"
+					},
+					"target": {
+						"bsonType": "string",
+						"description": "目标路径或链接"
+					},
+					"extra": {
+						"bsonType": "object",
+						"description": "附加配置"
+					}
+				}
+			}
+		},
+		"env": {
+			"bsonType": "string",
+			"description": "适用环境 all/mp/h5",
+			"defaultValue": "all"
+		},
+		"status": {
+			"bsonType": "string",
+			"description": "状态 online/offline",
+			"defaultValue": "online"
+		},
+		"publish_time": {
+			"bsonType": "long",
+			"description": "发布时间"
+		},
+		"updated_at": {
+			"bsonType": "long",
+			"defaultValue": {
+				"$env": "now"
+			},
+			"description": "更新时间"
+		}
+	}
+}

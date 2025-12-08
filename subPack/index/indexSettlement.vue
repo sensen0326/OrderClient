@@ -196,6 +196,7 @@
 				<view class="address-popup__title">选择收货地址</view>
 				<u-radio-group v-model="selectedAddressId">
 					<u-radio
+						class="address-radio"
 						v-for="item in addressList"
 						:key="item.id"
 						:name="item.id"
@@ -207,6 +208,9 @@
 								<text class="strong">{{item.receiver}}</text>
 								<text class="tel">{{item.mobile}}</text>
 								<text class="tag" v-if="item.tag">{{item.tag}}</text>
+								<view class="address-item__delete">
+									<u-button type="error" size="mini" plain @click.stop="removeAddress(item.id)">删除</u-button>
+								</view>
 							</view>
 							<view class="address-item__desc">{{item.detail}}</view>
 						</view>
@@ -225,9 +229,11 @@
 						<input
 							class="form-input__inner"
 							type="number"
+							maxlength="11"
 							:value="addressForm.mobile"
 							placeholder="手机号"
 							@input="handleAddressInput('mobile', $event)"
+							@blur="handleMobileBlur"
 						/>
 					</view>
 					<view class="form-input">
@@ -238,7 +244,7 @@
 							@input="handleAddressInput('detail', $event)"
 						/>
 					</view>
-					<u-button type="primary" class="u-m-t-20" @click="saveAddress">保存地址</u-button>
+					<u-button type="primary" plain class="u-m-t-30 btn-save-address" @click="saveAddress">保存地址</u-button>
 				</view>
 				<u-button v-else type="primary" plain class="u-m-t-30" @click="startAddAddress">新增地址</u-button>
 				<u-button type="primary" class="u-m-t-20" @click="closeAddressPopup">完成</u-button>
@@ -311,6 +317,7 @@ import couponService from '@/common/services/coupon.js'
 					mobile: '',
 					detail: ''
 				},
+				mobilePattern: /^1[3-9]\d{9}$/,
 				couponSheetShow: false,
 				couponList: [],
 				selectedCouponId: '',
@@ -447,7 +454,21 @@ import couponService from '@/common/services/coupon.js'
 			const profile = uni.getStorageSync('checkoutProfile') || {}
 			const addressStorage = uni.getStorageSync('userAddressList')
 			if (addressStorage && Array.isArray(addressStorage)) {
-				this.addressList = addressStorage
+				let newTagMarked = false
+				this.addressList = addressStorage.map((addr) => {
+					let tag = addr.tag === '新建' ? '新增' : addr.tag
+					if (tag === '新增') {
+						if (newTagMarked) {
+							tag = ''
+						} else {
+							newTagMarked = true
+						}
+					}
+					return {
+						...addr,
+						tag
+					}
+				})
 			} else {
 				this.addressList = [{
 					id: 'addr_default',
@@ -497,8 +518,16 @@ import couponService from '@/common/services/coupon.js'
 				this.form.leave = e && e.detail ? e.detail.value : ''
 			},
 			handleAddressInput(field, e) {
-				const value = e && e.detail ? e.detail.value : ''
+				let value = e && e.detail ? e.detail.value : ''
+				if (field === 'mobile') {
+					value = value.replace(/\D/g, '').slice(0, 11)
+				}
 				this.$set(this.addressForm, field, value)
+			},
+			handleMobileBlur() {
+				if (this.addressForm.mobile && !this.mobilePattern.test(this.addressForm.mobile)) {
+					this.$u.toast('请输入11位手机号')
+				}
 			},
 			handleInvoiceInput(field, e) {
 				const value = e && e.detail ? e.detail.value : ''
@@ -548,16 +577,37 @@ import couponService from '@/common/services/coupon.js'
 					this.$u.toast('请完整填写地址信息')
 					return
 				}
+				if (!this.mobilePattern.test(this.addressForm.mobile)) {
+					this.$u.toast('请输入有效的手机号')
+					return
+				}
+				this.addressList.forEach((addr, index) => {
+					if (addr.tag === '新增') {
+						this.$set(this.addressList[index], 'tag', '')
+					}
+				})
 				const newAddress = {
 					id: `addr_${Date.now()}`,
 					receiver: this.addressForm.receiver,
 					mobile: this.addressForm.mobile,
 					detail: this.addressForm.detail,
-					tag: '新建'
+					tag: '新增'
 				}
 				this.addressList.push(newAddress)
 				this.selectedAddressId = newAddress.id
 				this.addressFormVisible = false
+				this.persistAddresses()
+			},
+			removeAddress(id) {
+				const index = this.addressList.findIndex(item => item.id === id)
+				if (index === -1) return
+				this.addressList.splice(index, 1)
+				if (this.selectedAddressId === id) {
+					this.selectedAddressId = this.addressList.length ? this.addressList[0].id : ''
+				}
+				if (!this.addressList.length) {
+					this.addressFormVisible = true
+				}
 				this.persistAddresses()
 			},
 			persistAddresses() {
@@ -1029,6 +1079,22 @@ import couponService from '@/common/services/coupon.js'
 		padding: 40rpx;
 	}
 
+	.address-popup ::v-deep .u-radio-group {
+		display: flex;
+		flex-direction: column;
+		gap: 10rpx;
+	}
+
+	.address-radio {
+		display: block;
+		width: 100%;
+		padding: 10rpx 0;
+
+		::v-deep .u-radio__label {
+			width: 100%;
+		}
+	}
+
 	.address-popup__title {
 		font-size: 32rpx;
 		font-weight: bold;
@@ -1043,7 +1109,20 @@ import couponService from '@/common/services/coupon.js'
 	.address-item__title {
 		display: flex;
 		align-items: center;
+		gap: 12rpx;
+		flex-wrap: nowrap;
 		font-size: 28rpx;
+	}
+
+	.address-item__title .strong,
+	.address-item__title .tel,
+	.address-item__title .tag {
+		white-space: nowrap;
+	}
+
+	.address-item__title .tel {
+		color: #666;
+		margin-left: 8rpx;
 	}
 
 	.address-item__title .tag {
@@ -1055,10 +1134,20 @@ import couponService from '@/common/services/coupon.js'
 		margin-left: 12rpx;
 	}
 
+	.address-item__delete {
+		margin-left: auto;
+	}
+
 	.address-item__desc {
 		color: #666;
 		font-size: 26rpx;
 		margin-top: 8rpx;
+	}
+
+	.btn-save-address {
+		background-color: #ecf4ff;
+		color: #1677ff;
+		border: 1px solid #c9dcff;
 	}
 
 	.invoice-popup {

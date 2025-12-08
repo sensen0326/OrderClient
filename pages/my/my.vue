@@ -112,6 +112,32 @@
 			</view>
 		</view>
 
+		<view class="operation-section" v-if="operationQuickLinks.length">
+			<view class="section-title">精选推荐</view>
+			<scroll-view scroll-x class="operation-section__scroll" show-scrollbar="false">
+				<view class="operation-card" v-for="card in operationQuickLinks" :key="card.title" @click="handleOperationCard(card, 'my_quick_link')">
+					<image :src="card.image" mode="aspectFill" />
+					<view class="operation-card__body">
+						<view class="operation-card__title">{{ card.title }}</view>
+						<view class="operation-card__desc">{{ card.desc }}</view>
+					</view>
+				</view>
+			</scroll-view>
+		</view>
+
+		<view class="operation-campaigns" v-if="operationCampaigns.length">
+			<view class="section-title">专属权益</view>
+			<view class="operation-campaigns__grid">
+				<view class="operation-campaign" v-for="card in operationCampaigns" :key="card.title" @click="handleOperationCard(card, 'my_campaign')">
+					<image :src="card.image" mode="aspectFill" />
+					<view class="operation-campaign__info">
+						<view class="operation-campaign__title">{{ card.title }}</view>
+						<view class="operation-campaign__desc">{{ card.desc }}</view>
+					</view>
+				</view>
+			</view>
+		</view>
+
 		<view class="service-list">
 			<view class="section-title">我的服务</view>
 			<u-grid :col="4" :border="false">
@@ -127,6 +153,7 @@
 				<u-cell-item icon="rmb-circle" title="我的钱包" />
 				<u-cell-item icon="order" title="我的订单" />
 				<u-cell-item icon="coupon" title="我的优惠券" @click="refreshCoupons" />
+				<u-cell-item icon="chat" title="消息中心" @click="goMessageCenter" />
 				<u-cell-item icon="edit-pen" title="意见反馈" />
 				<u-cell-item icon="star" title="给个好评" />
 			</u-cell-group>
@@ -158,6 +185,8 @@
 import memberService from '@/common/services/member.js'
 import couponService from '@/common/services/coupon.js'
 import authService from '@/common/services/auth.js'
+import operationService from '@/common/services/operation.js'
+import analyticsService from '@/common/services/analytics.js'
 
 export default {
 	data() {
@@ -179,6 +208,8 @@ export default {
 			levelRules: [],
 			pointLedger: [],
 			phoneAuthLoading: false,
+			operationQuickLinks: [],
+			operationCampaigns: [],
 			serviceList: [
 				{ icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/icon-1.png', text: '积分签到' },
 				{ icon: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/icon-2.png', text: '积分商城' },
@@ -196,6 +227,10 @@ export default {
 	},
 	onShow() {
 		this.initMemberData()
+		this.loadOperationSlots()
+		analyticsService.track('page_view', {
+			page: 'my'
+		})
 	},
 	computed: {
 		pointLedgerSummary() {
@@ -216,6 +251,47 @@ export default {
 		}
 	},
 	methods: {
+		async loadOperationSlots() {
+			try {
+				const slots = await operationService.fetchSlots(['my_quick_links', 'my_campaigns'])
+				this.operationQuickLinks = (slots.my_quick_links && slots.my_quick_links.items) || []
+				this.operationCampaigns = (slots.my_campaigns && slots.my_campaigns.items) || []
+			} catch (err) {
+				console.warn('load my operation slots failed', err)
+				this.operationQuickLinks = []
+				this.operationCampaigns = []
+			}
+		},
+		handleOperationCard(item, source = 'my') {
+			if (!item) return
+			analyticsService.track('operation_click', {
+				source,
+				title: item.title,
+				action: item.action,
+				target: item.target
+			})
+			this.openOperationTarget(item)
+		},
+		openOperationTarget(item = {}) {
+			const action = item.action || 'page'
+			if (action === 'tab' && item.target) {
+				uni.switchTab({
+					url: item.target
+				})
+				return
+			}
+			if (action === 'page' && item.target) {
+				uni.navigateTo({
+					url: item.target
+				})
+				return
+			}
+			if (action === 'url' && item.target) {
+				uni.navigateTo({
+					url: item.target
+				})
+			}
+		},
 		withDefaultAvatar(profile = {}) {
 			if (!profile) return profile
 			return profile.avatar ? profile : { ...profile, avatar: this.defaultAvatar }
@@ -404,15 +480,44 @@ export default {
 			}
 		},
 		handleServiceClick(name) {
+			analyticsService.track('service_entry_click', {
+				name
+			})
 			if (name === '积分签到') {
 				this.handleSignIn()
 			} else if (name === '积分商城') {
 				this.loadPointGoods()
 			} else if (name === '领券中心') {
 				this.refreshCoupons()
+			} else if (name === '联系客服') {
+				this.goSupportCenter()
 			} else {
 				this.$u.toast(`${name} 敬请期待`)
 			}
+		},
+		goSupportCenter() {
+			if (!this.isLoggedIn) {
+				this.$u.toast('请先登录')
+				return
+			}
+			analyticsService.track('support_entry', {
+				source: 'my_service'
+			})
+			uni.navigateTo({
+				url: '/subPack/service/supportCenter'
+			})
+		},
+		goMessageCenter() {
+			if (!this.isLoggedIn) {
+				this.$u.toast('请先登录')
+				return
+			}
+			analyticsService.track('message_center_entry', {
+				source: 'my_links'
+			})
+			uni.navigateTo({
+				url: '/subPack/service/messageCenter'
+			})
 		},
 		goPointLedger() {
 			if (!this.isLoggedIn) {
@@ -863,6 +968,91 @@ async function listCouponTemplates() {
 	&__cost {
 		font-size: 24rpx;
 		color: #fa5151;
+	}
+}
+
+.operation-section {
+	margin: 0 30rpx 30rpx;
+
+	&__scroll {
+		white-space: nowrap;
+	}
+}
+
+.operation-card {
+	display: inline-flex;
+	width: 520rpx;
+	background: linear-gradient(135deg, #fff3f2, #ffe8e4);
+	border-radius: 24rpx;
+	padding: 20rpx;
+	margin-right: 20rpx;
+	align-items: center;
+	box-shadow: 0 10rpx 24rpx rgba(238, 47, 55, 0.1);
+
+	image {
+		width: 140rpx;
+		height: 140rpx;
+		border-radius: 18rpx;
+		margin-right: 20rpx;
+	}
+
+	&__body {
+		flex: 1;
+	}
+
+	&__title {
+		font-size: 30rpx;
+		font-weight: bold;
+		margin-bottom: 6rpx;
+	}
+
+	&__desc {
+		color: #606266;
+		font-size: 24rpx;
+	}
+}
+
+.operation-campaigns {
+	margin: 0 30rpx 30rpx;
+
+	&__grid {
+		display: flex;
+		flex-direction: column;
+		gap: 20rpx;
+	}
+}
+
+.operation-campaign {
+	display: flex;
+	background: #fff;
+	border-radius: 20rpx;
+	border: 1px solid #f2f2f2;
+	padding: 20rpx;
+	box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.04);
+
+	image {
+		width: 160rpx;
+		height: 120rpx;
+		border-radius: 16rpx;
+		margin-right: 20rpx;
+	}
+
+	&__info {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	&__title {
+		font-size: 30rpx;
+		font-weight: bold;
+	}
+
+	&__desc {
+		font-size: 24rpx;
+		color: #606266;
+		margin-top: 6rpx;
 	}
 }
 

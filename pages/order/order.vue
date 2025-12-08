@@ -164,6 +164,9 @@
 				if (order.pay_status === 'paid' && ['paid', 'preparing', 'delivering', 'completed'].includes(order.order_status)) {
 					actions.push({ key: 'refund', label: '申请售后', danger: true })
 				}
+				if (order.order_status === 'completed') {
+					actions.push({ key: 'review', label: '评价' })
+				}
 				actions.push({ key: 'detail', label: '查看详情' })
 				actions.push({ key: 'repeat', label: '再来一单' })
 				return actions
@@ -218,6 +221,10 @@
 				}
 				if (action === 'detail') {
 					this.orderDetail(order.order_no)
+					return
+				}
+				if (action === 'review') {
+					this.goReview(order)
 					return
 				}
 				if (action === 'cancel') {
@@ -293,6 +300,12 @@
 					console.error('remind failed', err)
 					this.$u.toast(err.message || '催单失败')
 				}
+			},
+			goReview(order) {
+				if (!order || !order.order_no) return
+				uni.navigateTo({
+					url: `/subPack/order/reviewSubmit?orderNo=${order.order_no}`
+				})
 			}
 		}
 	}

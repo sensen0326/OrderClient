@@ -1,122 +1,149 @@
 {
-	"easycom": {
-		"custom": {
-			"^u-(.*)": "uview-ui/components/u-$1/u-$1.vue"
-		}
-	},
-	"pages": [{
-			"path": "pages/index/index",
-			"style": {
-				"navigationStyle": "custom"
-			}
-		},
-		{
-			"path": "pages/menu/menu",
-			"style": {
-				"navigationBarTitleText": "私房菜"
-			}
-		},
-		{
-			"path": "pages/order/order",
-			"style": {
-				"navigationBarTitleText": "订单"
-			}
-		},
-		{
-			"path": "pages/my/my",
-			"style": {
-				"navigationStyle": "custom"
-			}
-		}
-	,{
-    "path": "uni_modules/uni-pay/pages/success/success",
-    "style": {
-        "backgroundColor": "#F8F8F8",
-        "navigationBarTitleText": "支付成功"
+ "easycom": {
+  "custom": {
+   "^u-(.*)": "uview-ui/components/u-$1/u-$1.vue"
+  }
+ },
+ "pages": [
+  {
+   "path": "pages/index/index",
+   "style": {
+    "navigationStyle": "custom"
+   }
+  },
+  {
+   "path": "pages/menu/menu",
+   "style": {
+    "navigationBarTitleText": "私房菜"
+   }
+  },
+  {
+   "path": "pages/order/order",
+   "style": {
+    "navigationBarTitleText": "订单"
+   }
+  },
+  {
+   "path": "pages/my/my",
+   "style": {
+    "navigationStyle": "custom"
+   }
+  },
+  {
+   "path": "uni_modules/uni-pay/pages/success/success",
+   "style": {
+    "backgroundColor": "#F8F8F8",
+    "navigationBarTitleText": "支付成功"
+   }
+  },
+  {
+   "path": "uni_modules/uni-pay/pages/ad-interactive-webview/ad-interactive-webview",
+   "style": {
+    "backgroundColor": "#F8F8F8",
+    "navigationBarTitleText": "ad"
+   }
+  },
+  {
+   "path": "uni_modules/uni-pay/pages/pay-desk/pay-desk",
+   "style": {
+    "backgroundColor": "#F8F8F8",
+    "navigationBarTitleText": "收银台"
+   }
+  }
+ ],
+ "subPackages": [
+  {
+   "root": "subPack",
+   "pages": [
+    {
+     "path": "index/indexSettlement",
+     "style": {
+      "navigationBarTitleText": "确认订单"
+     }
+    },
+    {
+     "path": "index/indexPaysuccess",
+     "style": {
+      "navigationStyle": "custom"
+     }
+    },
+    {
+     "path": "order/orderDetail",
+     "style": {
+      "navigationBarTitleText": "订单详情"
+     }
+    },
+    {
+     "path": "member/pointLedger",
+     "style": {
+      "navigationBarTitleText": "积分流水",
+      "enablePullDownRefresh": false
+     }
+    },
+    {
+     "path": "order/reviewSubmit",
+     "style": {
+      "navigationBarTitleText": "订单评价"
+     }
+    },
+    {
+     "path": "service/supportCenter",
+     "style": {
+      "navigationBarTitleText": "售后与客服"
+     }
+    },
+    {
+     "path": "service/messageCenter",
+     "style": {
+      "navigationBarTitleText": "消息中心"
+     }
     }
-}
-,{
-    "path": "uni_modules/uni-pay/pages/ad-interactive-webview/ad-interactive-webview",
-    "style": {
-        "backgroundColor": "#F8F8F8",
-        "navigationBarTitleText": "ad"
-    }
-}
-,{
-    "path": "uni_modules/uni-pay/pages/pay-desk/pay-desk",
-    "style": {
-        "backgroundColor": "#F8F8F8",
-        "navigationBarTitleText": "收银台"
-    }
-}
-],
-	// subcontract loading
-	"subPackages": [{
-		"root": "subPack",
-		"pages": [{
-				"path": "index/indexSettlement",
-				"style": {
-					"navigationBarTitleText": "确认订单"
-				}
-			},
-			{
-				"path": "index/indexPaysuccess",
-				"style": {
-					"navigationStyle": "custom"
-				}
-			},
-			{
-				"path": "order/orderDetail",
-				"style": {
-					"navigationBarTitleText": "订单详情"
-				}
-			},
-			{
-				"path": "member/pointLedger",
-				"style": {
-					"navigationBarTitleText": "积分流水",
-					"enablePullDownRefresh": false
-				}
-			}
-		]
-	}],
-	// subcontract preload configuration
-	"preloadRule": {
-		"pages/index/index": {
-			"network": "all",
-			"packages": ["subPack"]
-		}
-	},
-	"globalStyle": {
-		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "七云菜馆智能点餐",
-		"navigationBarBackgroundColor": "#ffffff",
-		"backgroundColor": "#ffffff"
-	},
-	"uniIdRouter": {},
-	"tabBar": {
-		"color": "#CDCDCD",
-		"selectedColor": "#EE2F37",
-		"list": [{
-			"pagePath": "pages/index/index",
-			"text": "首页",
-			"iconPath": "static/tabbar/index.png",
-			"selectedIconPath": "static/tabbar/s-index.png"
-		}, {
-			"pagePath": "pages/menu/menu",
-			"text": "点餐",
-			"iconPath": "static/tabbar/meal.png",
-			"selectedIconPath": "static/tabbar/s-meal.png"
-		}, {
-			"pagePath": "pages/order/order",
-			"text": "订单",
-			"iconPath": "static/tabbar/order.png",
-			"selectedIconPath": "static/tabbar/s-order.png"
-		}, {
-			"pagePath": "pages/my/my",
-			"text": "我的",
-			"iconPath": "static/tabbar/my.png",
-			"selectedIconPath": "static/tabbar/s-my.png"
-		}]
-	}
+   ]
+  }
+ ],
+ "preloadRule": {
+  "pages/index/index": {
+   "network": "all",
+   "packages": [
+    "subPack"
+   ]
+  }
+ },
+ "globalStyle": {
+  "navigationBarTextStyle": "black",
+  "navigationBarTitleText": "七云菜馆智能点餐",
+  "navigationBarBackgroundColor": "#ffffff",
+  "backgroundColor": "#ffffff"
+ },
+ "uniIdRouter": {},
+ "tabBar": {
+  "color": "#CDCDCD",
+  "selectedColor": "#EE2F37",
+  "list": [
+   {
+    "pagePath": "pages/index/index",
+    "text": "首页",
+    "iconPath": "static/tabbar/index.png",
+    "selectedIconPath": "static/tabbar/s-index.png"
+   },
+   {
+    "pagePath": "pages/menu/menu",
+    "text": "点餐",
+    "iconPath": "static/tabbar/meal.png",
+    "selectedIconPath": "static/tabbar/s-meal.png"
+   },
+   {
+    "pagePath": "pages/order/order",
+    "text": "订单",
+    "iconPath": "static/tabbar/order.png",
+    "selectedIconPath": "static/tabbar/s-order.png"
+   },
+   {
+    "pagePath": "pages/my/my",
+    "text": "我的",
+    "iconPath": "static/tabbar/my.png",
+    "selectedIconPath": "static/tabbar/s-my.png"
+   }
+  ]
+ }
 }

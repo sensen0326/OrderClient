@@ -83,6 +83,19 @@
 				<u-button type="error" plain @click="applyRefund">申请退款</u-button>
 			</view>
 
+			<view
+				class="review-entry"
+				v-if="orderInfo && orderInfo.order_status === 'completed'"
+			>
+				<u-button
+					type="primary"
+					:plain="hasReview"
+					@click="hasReview ? $u.toast('已评价') : goReview()"
+				>
+					{{ hasReview ? '已完成评价' : '去评价' }}
+				</u-button>
+			</view>
+
 			<view class="status-actions" v-if="statusActions.length">
 				<view class="status-actions__title">手动更新状态</view>
 				<view class="status-actions__btns">
@@ -116,6 +129,7 @@
 	import orderService, { STATUS_FLOW } from '@/common/services/order.js'
 	import paymentService from '@/common/services/payment.js'
 	import kitchenService from '@/common/services/kitchen.js'
+	import reviewService from '@/common/services/review.js'
 
 	const STATUS_TEXT = {
 		pending: '待支付',
@@ -144,7 +158,9 @@
 				statusLogs: [],
 				loading: false,
 				refundLoading: false,
-				kitchenTicket: null
+				kitchenTicket: null,
+				reviewLoaded: false,
+				hasReview: false
 			}
 		},
 		computed: {
@@ -237,6 +253,7 @@
 						statusText: STATUS_TEXT[log.status] || log.status
 					}))
 					this.fetchKitchenTicket()
+					this.loadReviewState()
 				} catch (err) {
 					console.error('order detail load failed', err)
 					this.$u.toast(err.message || '加载订单详情失败')
@@ -260,6 +277,18 @@
 				} catch (err) {
 					console.warn('load kitchen ticket failed', err)
 					this.kitchenTicket = null
+				}
+			},
+			async loadReviewState() {
+				if (!this.orderNo) return
+				try {
+					const list = await reviewService.listByOrder(this.orderNo)
+					this.hasReview = Array.isArray(list) && list.length > 0
+				} catch (err) {
+					console.warn('load review state failed', err)
+					this.hasReview = false
+				} finally {
+					this.reviewLoaded = true
 				}
 			},
 			async updateStatus(nextStatus) {
@@ -292,6 +321,12 @@
 				} finally {
 					this.refundLoading = false
 				}
+			},
+			goReview() {
+				if (!this.orderNo) return
+				uni.navigateTo({
+					url: `/subPack/order/reviewSubmit?orderNo=${this.orderNo}`
+				})
 			}
 		}
 	}
@@ -372,6 +407,14 @@
 
 	.refund-bar {
 		margin: 30rpx 0;
+	}
+
+	.review-entry {
+		margin-bottom: 20rpx;
+
+		.u-button {
+			width: 100%;
+		}
 	}
 
 	.status-log {

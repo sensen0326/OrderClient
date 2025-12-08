@@ -1,0 +1,39 @@
+{
+	"bsonType": "object",
+	"required": ["review_id", "type", "url"],
+	"permission": {
+		"read": true,
+		"create": false,
+		"update": false,
+		"delete": false
+	},
+	"properties": {
+		"_id": {
+			"description": "媒体 ID"
+		},
+		"review_id": {
+			"bsonType": "string",
+			"description": "所属评价 ID"
+		},
+		"type": {
+			"bsonType": "string",
+			"description": "类型 image/video",
+			"defaultValue": "image"
+		},
+		"url": {
+			"bsonType": "string",
+			"description": "资源地址"
+		},
+		"cover": {
+			"bsonType": "string",
+			"description": "封面图（视频用）"
+		},
+		"created_at": {
+			"bsonType": "long",
+			"description": "上传时间",
+			"defaultValue": {
+				"$env": "now"
+			}
+		}
+	}
+}
