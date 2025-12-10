@@ -1,7 +1,6 @@
 // 云对象教程: https://uniapp.dcloud.net.cn/uniCloud/cloud-obj
 // 小程序码接口文档: https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/qrcode-link/qr-code/getUnlimitedQRCode.html
 const db = uniCloud.database()
-const dbCmd = db.command
 
 // 微信小程序配置，可直接改写或通过环境变量覆盖
 const WEAPP_APPID = process.env.WX_APP_ID || 'wxbde48866849ac33d'
@@ -30,20 +29,18 @@ async function getAccessToken() {
 
 async function getQrCodeBuffer(scene, page) {
 	const token = await getAccessToken()
-	const res = await uniCloud.httpclient.request(
-		`https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${token}`,
-		{
-			method: 'POST',
-			dataType: 'arraybuffer',
-			data: {
-				scene,
-				page,
-				check_path: false,
-				env_version: ENV_VERSION
-			},
-			timeout: 10000
-		}
-	)
+	const res = await uniCloud.httpclient.request(`https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${token}`, {
+		method: 'POST',
+		dataType: 'arraybuffer',
+		data: {
+			scene,
+			page,
+			check_path: false,
+			env_version: ENV_VERSION
+		},
+		contentType: 'json',
+		timeout: 10000
+	})
 
 	const contentType = res.headers['content-type'] || ''
 	if (contentType.includes('json')) {
@@ -69,7 +66,8 @@ module.exports = {
 	 * @param {string} tableNo 桌号，支持数字或字母
 	 * @returns {Promise<object>} 桌号记录
 	 */
-	async create(tableNo) {
+	async create(payload = {}) {
+		const { tableNo, page: customPage, scene: customScene } = payload
 		if (!tableNo) {
 			return {
 				errCode: 'INVALID_TABLE_NO',
@@ -77,9 +75,11 @@ module.exports = {
 			}
 		}
 
-		const page = QR_PAGE
-		const rawScene = `table=${encodeURIComponent(String(tableNo))}`
-		const scene = rawScene.length > 32 ? rawScene.slice(0, 32) : rawScene
+		const page = customPage || QR_PAGE
+		const cleanedTableNo = String(tableNo).replace(/[^a-zA-Z0-9]/g, '')
+		const safeTableNo = cleanedTableNo || Date.now().toString(36)
+		const baseScene = customScene ? String(customScene).replace(/[^a-zA-Z0-9]/g, '') : `table${safeTableNo}`
+		const scene = baseScene.length > 32 ? baseScene.slice(0, 32) : baseScene
 
 		let qrBuffer
 		try {
@@ -140,7 +140,7 @@ module.exports = {
 			page,
 			qrcode_file_id: fileID,
 			qrcode_url: tempUrl,
-			create_time: dbCmd.serverDate()
+			create_time: Date.now()
 		})
 
 		return {

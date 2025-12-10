@@ -4,6 +4,7 @@ const db = uniCloud.database()
 const dbCmd = db.command
 const CATEGORY_COLLECTION = 'dish_category'
 const DISH_COLLECTION = 'dish'
+const RECOMMEND_COLLECTION = 'dish_recommend_slot'
 const ADMIN_TOKEN = process.env.DISH_ADMIN_TOKEN || 'local-dev-token'
 const {
 	categories: seedCategories,
@@ -192,6 +193,25 @@ module.exports = {
 			})
 			.orderBy('recommend_weight', 'desc')
 			.limit(limit)
+			.get()
+		return res.data || []
+	},
+	async listRecommendSlots(params = {}) {
+		await ensureSeedData()
+		const {
+			slotCode = '',
+			restaurantId = 'default'
+		} = params
+		const where = {
+			status: 1,
+			restaurant_scope: dbCmd.in([restaurantId, 'ALL'])
+		}
+		if (slotCode) {
+			where.slot_code = slotCode
+		}
+		const res = await db.collection(RECOMMEND_COLLECTION)
+			.where(where)
+			.orderBy('sort', 'asc')
 			.get()
 		return res.data || []
 	},

@@ -5,5 +5,5 @@
  */
 
 module.exports = {
-	enableUniPayAuth: true
+	enableUniPayAuth: false
 }
