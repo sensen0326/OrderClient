@@ -570,7 +570,7 @@ export default {
 				return this.profileForm.avatar
 			}
 			try {
-				const cloudPath = `avatar/${Date.now()}-${Math.floor(Math.random() * 100000)}.png`
+				const cloudPath = `/cloudstorage/avatar/${Date.now()}-${Math.floor(Math.random() * 100000)}.png`
 				const uploadRes = await uniCloud.uploadFile({
 					cloudPath,
 					filePath: this.profileForm.avatarTemp,

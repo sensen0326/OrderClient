@@ -94,7 +94,7 @@ module.exports = {
 		let fileID = ''
 		let tempUrl = ''
 		try {
-			const fileName = `zhuohao/${tableNo}-${Date.now()}.png`
+			const fileName = `/cloudstorage/zhuohao/${tableNo}-${Date.now()}.png`
 			const uploadRes = await uniCloud.uploadFile({
 				cloudPath: fileName,
 				fileContent: qrBuffer
