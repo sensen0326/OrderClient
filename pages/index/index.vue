@@ -216,6 +216,8 @@ import queueService from '@/common/services/queue.js'
 import operationService from '@/common/services/operation.js'
 import analyticsService from '@/common/services/analytics.js'
 
+const TAB_PAGES = ['/pages/index/index', '/pages/menu/menu', '/pages/order/order', '/pages/my/my']
+
 export default {
 	data() {
 		return {
@@ -469,26 +471,17 @@ export default {
 				this.orderFood(1)
 				return
 			}
-			if (action === 'tab') {
-				if (item.target) {
-					uni.switchTab({
-						url: item.target
-					})
-				}
+			if ((action === 'tab' || action === 'page' || action === 'url') && item.target) {
+				this.navigateSmart(item.target)
 				return
 			}
-			if (action === 'page') {
-				if (item.target) {
-					uni.navigateTo({
-						url: item.target
-					})
-				}
-				return
-			}
-			if (action === 'url' && item.target) {
-				uni.navigateTo({
-					url: item.target
-				})
+		},
+		navigateSmart(url) {
+			if (!url) return
+			if (TAB_PAGES.includes(url)) {
+				uni.switchTab({ url })
+			} else {
+				uni.navigateTo({ url })
 			}
 		},
 		selectPeople(val) {

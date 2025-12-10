@@ -188,6 +188,8 @@ import authService from '@/common/services/auth.js'
 import operationService from '@/common/services/operation.js'
 import analyticsService from '@/common/services/analytics.js'
 
+const TAB_PAGES = ['/pages/index/index', '/pages/menu/menu', '/pages/order/order', '/pages/my/my']
+
 export default {
 	data() {
 		const stored = memberService.getStoredProfile()
@@ -274,22 +276,16 @@ export default {
 		},
 		openOperationTarget(item = {}) {
 			const action = item.action || 'page'
-			if (action === 'tab' && item.target) {
-				uni.switchTab({
-					url: item.target
-				})
-				return
+			if ((action === 'tab' || action === 'page' || action === 'url') && item.target) {
+				this.navigateSmart(item.target)
 			}
-			if (action === 'page' && item.target) {
-				uni.navigateTo({
-					url: item.target
-				})
-				return
-			}
-			if (action === 'url' && item.target) {
-				uni.navigateTo({
-					url: item.target
-				})
+		},
+		navigateSmart(url) {
+			if (!url) return
+			if (TAB_PAGES.includes(url)) {
+				uni.switchTab({ url })
+			} else {
+				uni.navigateTo({ url })
 			}
 		},
 		withDefaultAvatar(profile = {}) {

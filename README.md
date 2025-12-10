@@ -26,6 +26,7 @@
 | F14~F17 | 会员、积分、优惠券、积分商城 | `pages/my/my.vue`、`subPack/member/pointLedger.vue` | `member`、`coupon`、`point_goods` |
 | F18~F20 | 评价、售后、消息中心 | `subPack/order/orderDetail.vue`、`subPack/service/supportCenter.vue`、`subPack/service/messageCenter.vue` | `review`、`support`、`message` |
 | F21~F22 | 运营配置、数据埋点 | `pages/index/index.vue`、`pages/my/my.vue` | `operation`、`analytics` |
+| **F23** | uniCloud 服务网关 | 统一由 `service.call` 间接访问 | `service` |
 
 > 需求详情可参考根目录《需求文档.md》，README 仅对已实现部分做工程化描述。
 
@@ -172,6 +173,7 @@
 
 | 云对象 | 方法 | 请求示例 | 说明 |
 | --- | --- | --- | --- |
+| `service` | `call({ service, action, params, token })` | `uniCloud.importObject('service').call({ service: 'dish', action: 'list', params: { restaurantId: 'default' } })` | 统一服务网关（F23），支持鉴权、参数校验、限流、日志；其余接口都可通过此方法调用。 |
 | `dish` | `list({ restaurantId })` | `uniCloud.importObject('dish').list({ restaurantId: 'default', categoryId })` | 返回菜品列表，包含 SKU、加料选项。 |
 | `cart` | `sync({ sessionId, payload })` | `cartService.syncRemote(cartSessionId, cartMap)` | 把本地购物车同步到云端，会返回最新 session。 |
 | `order` | `create(payload)` | `orderService.create(cartSnapshot)` | 创建订单，支持堂食/外卖字段、优惠券、发票等。 |
