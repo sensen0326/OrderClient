@@ -169,8 +169,34 @@
 
 ---
 
-## 10. API / 云对象速查表
+## 10. 静态资源切换指南
 
+项目里的演示图片分为两类：一类位于 `/static` 目录，方便离线预览；另一类已经上传到 uniCloud 存储并通过 CDN 暴露（代码中以 `https://*.cdn.bspapp.com/cloudstorage/static/...` 形式出现）。按照下面的方式即可在“本地预览”和“线上部署”之间切换：
+
+1. **本地预览 / Mock 阶段**
+   - 将素材放在 `static/menu`、`static/my`、`static/tabbar` 等目录，业务代码直接引用 `/static/**/*.png` 即可，HBuilderX 与微信开发者工具会自动把它们打入包体，适合离线演示。
+   - 典型示例：`pages.json` 的 tabBar 图标、`uni_modules/uni-pay` 的默认 logo、部分示例组件仍然指向 `/static`，无需网络即可查看。
+2. **正式环境 / 线上部署**
+   - 通过 uniCloud 控制台或 `uniCloud.uploadFile` 将 `/static` 目录迁移到云存储，建议保持 `cloudstorage/static/<分类>/<文件>` 的目录结构，便于脚本替换。
+   - 把配置或 Mock 数据中的图片字段替换成云端地址。例如 `common/menu.js`、`common/services/operation.js`、`pages/index/index.vue`、`pages/my/my.vue`、`common/services/member.js` 以及 `uniCloud-aliyun/cloudfunctions/member/index.obj.js` 默认都引用了 CDN 示例域名，上线时替换为自己的 OSS/CDN 域名即可。
+3. **封装统一的资源前缀**
+   - 建议在公共模块里实现 `assetUrl(path)`，根据 `NODE_ENV` 返回 `/static` 或 CDN 前缀。示例：
+     ```js
+     const ASSET_BASE = process.env.NODE_ENV === 'development'
+       ? '/static'
+       : 'https://<your-cdn-domain>/cloudstorage/static'
+
+     export const assetUrl = (path) => `${ASSET_BASE}${path}`
+     ```
+     随后在 Mock 数据里统一写成 `assetUrl('/menu/menulist/gbyd.png')`，即可做到“一处切换，处处生效”。
+   - 若后端表需要存储图片（如 `dish.cover`、`operation_slot.items[].image`、`review_media.url`、`support_ticket.attachments` 等），录入时直接保存云存储 `fileID` 或公开 URL，前端可用 `uniCloud.getTempFileURL` 将 `fileID` 转换为临时访问链接。
+4. **联调注意事项**
+   - 真机调试前务必把 CDN 域名加入微信小程序 downloadFile 合法域名，否则线上地址会被拦截。
+   - 如果需要在同一份代码里手动切换，可结合 `.env.local/.env.prod`、条件编译（如 `#ifdef MP-WEIXIN`）或自定义配置来修改 `ASSET_BASE`。
+
+---
+
+## 11. API / 云对象速查表
 | 云对象 | 方法 | 请求示例 | 说明 |
 | --- | --- | --- | --- |
 | `service` | `call({ service, action, params, token })` | `uniCloud.importObject('service').call({ service: 'dish', action: 'list', params: { restaurantId: 'default' } })` | 统一服务网关（F23），支持鉴权、参数校验、限流、日志；其余接口都可通过此方法调用。 |
@@ -189,7 +215,7 @@
 
 ---
 
-## 11. 部署脚本 / 自动化示例
+## 12. 部署脚本 / 自动化示例
 
 下方脚本展示了一个最简的构建 + 同步流程，可根据团队 CI/CD 需求扩展。
 
