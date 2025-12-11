@@ -1,182 +1,186 @@
 'use strict'
 
-const db = uniCloud.database()
+const db = uniCloud.database()\nconst dbCmd = db.command
 const CART_COLLECTION = 'cart_sessions'
-const TABLE_COLLECTION = 'restaurant_table'
 const TABLE_SESSION_COLLECTION = 'table_session'
 
-function normalizeItems(items = []) {
-	return (items || []).map(item => {
-		const quantity = Number(item.quantity) || 0
-		return {
-			key: item.key || `${item.dishId || ''}_${item.skuId || ''}_${item.optionsText || ''}`,
-			dishId: item.dishId || '',
-			dishName: item.dishName || item.name || '',
-			dishImg: item.dishImg || item.cover || '',
-			skuId: item.skuId || '',
-			skuName: item.skuName || '',
-			quantity,
-			price: Number(item.price) || 0,
-			packageFee: Number(item.packageFee || 0),
-			options: Array.isArray(item.options) ? item.options : [],
-			optionsText: item.optionsText || '',
-			desc: item.desc || item.remark || ''
-		}
-	}).filter(item => item.quantity > 0)
+function ensureString(val) {
+  if (typeof val === 'string') return val
+  if (val === undefined || val === null) return ''
+  return String(val)
 }
 
-function calcAmountDetail(items = [], fees = {}, promotion = {}) {
-	const goods = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-	const autoPackage = items.reduce((sum, item) => sum + item.packageFee * item.quantity, 0)
-	const packageFee = autoPackage + Number(fees.packageFee || fees.package || 0)
-	const deliveryFee = Number(fees.deliveryFee || fees.delivery || 0)
-	const serviceFee = Number(fees.serviceFee || 0)
-	const discountDetail = []
-	let discount = Number(fees.discount || 0)
+function roundToTwo(num) {
+  return Number((Number(num) || 0).toFixed(2))
+}
 
-	if (promotion && promotion.coupon && Number(promotion.coupon.amount)) {
-		const amount = Math.min(goods, Number(promotion.coupon.amount))
-		discount += amount
-		discountDetail.push({
-			type: 'coupon',
-			title: promotion.coupon.title || '优惠券',
-			amount: Number(amount.toFixed(2)),
-			couponId: promotion.coupon.couponId || ''
-		})
-	}
-
-	if (promotion && promotion.points && Number(promotion.points.amount)) {
-		const amount = Math.min(goods, Number(promotion.points.amount))
-		discount += amount
-		discountDetail.push({
-			type: 'points',
-			title: promotion.points.title || '积分抵扣',
-			points: promotion.points.points || 0,
-			amount: Number(amount.toFixed(2))
-		})
-	}
-
-	const payable = Math.max(goods + packageFee + deliveryFee + serviceFee - discount, 0)
-	return {
-		goods: Number(goods.toFixed(2)),
-		package: Number(packageFee.toFixed(2)),
-		delivery: Number(deliveryFee.toFixed(2)),
-		service: Number(serviceFee.toFixed(2)),
-		discount: Number(discount.toFixed(2)),
-		payable: Number(payable.toFixed(2)),
-		discountDetail
-	}
+function normalizeItems(items = []) {
+  if (!Array.isArray(items)) return []
+  return items
+    .map(item => {
+      const quantity = Number(item.quantity || item.value) || 0
+      const price = Number(item.price) || 0
+      return {
+        key: item.key || `${item.dishId || ''}_${item.skuId || ''}_${item.optionsText || ''}`,
+        dishId: ensureString(item.dishId || item.dish_id),
+        dishName: ensureString(item.dishName || item.dish_name || item.name),
+        dishImg: ensureString(item.dishImg || item.dish_img || item.icon || item.cover),
+        skuId: ensureString(item.skuId || item.sku_id),
+        skuName: ensureString(item.skuName || item.sku_name),
+        quantity,
+        price,
+        packageFee: Number(item.packageFee || item.package_fee || 0),
+        options: Array.isArray(item.options) ? item.options : [],
+        optionsText: ensureString(item.optionsText || item.options_text),
+        desc: ensureString(item.desc || item.remark || '')
+      }
+    })
+    .filter(item => item.quantity > 0)
 }
 
 async function loadCart(sessionId) {
-	if (!sessionId || sessionId === 'local') return null
-	const res = await db.collection(CART_COLLECTION).doc(sessionId).get()
-	return res.data && res.data.length ? res.data[0] : null
+  if (!sessionId || sessionId === 'local') return null
+  const res = await db.collection(CART_COLLECTION).doc(sessionId).get()
+  return res.data && res.data.length ? res.data[0] : null
 }
 
-async function fetchTableInfo(cart, payload = {}) {
-	const tableNo = payload.tableNo || (cart && cart.table_no) || ''
-	if (!tableNo) return null
-	const tableRes = await db.collection(TABLE_COLLECTION).where({
-		table_no: tableNo
-	}).limit(1).get()
-	const table = tableRes.data && tableRes.data.length ? tableRes.data[0] : null
-	const tableSessionId = payload.tableSessionId || (cart && cart.session_id) || (table && table.current_session_id) || ''
-	let peopleCount = Number(payload.peopleCount || (cart && cart.meta && cart.meta.peopleCount) || (table && table.seat_count) || 0)
-	if (tableSessionId) {
-		const sessionRes = await db.collection(TABLE_SESSION_COLLECTION).doc(tableSessionId).get()
-		if (sessionRes.data && sessionRes.data.length) {
-			peopleCount = sessionRes.data[0].people_count || peopleCount
-		}
-	}
-	return {
-		tableNo,
-		sessionId: tableSessionId,
-		status: (table && table.status) || 'ordering',
-		peopleCount
-	}
+async function loadTableSession(tableNo) {
+  if (!tableNo) return null
+  const res = await db
+    .collection(TABLE_SESSION_COLLECTION)
+    .where({ table_no: tableNo, status: dbCmd.neq('closed') })
+    .orderBy('updated_at', 'desc')
+    .limit(1)
+    .get()
+  return res.data && res.data.length ? res.data[0] : null
+}
+
+function calcFeeDetail(items, feeInput = {}, channel = 'dine_in') {
+  const goods = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const autoPackage = items.reduce((sum, item) => sum + item.packageFee * item.quantity, 0)
+  const packageFee = autoPackage + Number(feeInput.packageFee || feeInput.package || 0)
+  const deliveryFee = channel === 'takeout' ? Number(feeInput.deliveryFee || feeInput.delivery || 5) : Number(feeInput.deliveryFee || feeInput.delivery || 0)
+  const serviceFee = Number(feeInput.serviceFee || feeInput.service || 0)
+  const discount = Number(feeInput.discount || 0)
+  const payableInput = Number(feeInput.payable || 0)
+  const payable = payableInput > 0 ? payableInput : goods + packageFee + deliveryFee + serviceFee - discount
+  return {
+    goods: roundToTwo(goods),
+    packageFee: roundToTwo(packageFee),
+    deliveryFee: roundToTwo(deliveryFee),
+    serviceFee: roundToTwo(serviceFee),
+    discount: roundToTwo(discount),
+    payable: roundToTwo(Math.max(payable, 0))
+  }
+}
+
+function resolvePeopleCount(payload, cart, tableInfo) {
+  const fromPayload = Number(payload.peopleCount) || 0
+  if (fromPayload > 0) return fromPayload
+  if (payload.meta && Number(payload.meta.peopleCount)) return Number(payload.meta.peopleCount)
+  if (cart && cart.meta && Number(cart.meta.peopleCount)) return Number(cart.meta.peopleCount)
+  if (tableInfo && Number(tableInfo.people_count || tableInfo.peopleCount)) {
+    return Number(tableInfo.people_count || tableInfo.peopleCount)
+  }
+  const participantCount = cart && Array.isArray(cart.participants) ? cart.participants.length : 0
+  return participantCount || 0
 }
 
 function buildSnapshotItems(items = []) {
-	return items.map(item => ({
-		dishId: item.dishId,
-		name: item.dishName,
-		desc: item.desc,
-		icon: item.dishImg,
-		skuName: item.skuName,
-		optionsText: item.optionsText,
-		price: item.price,
-		value: item.quantity
-	}))
+  return items.map(item => ({
+    dishId: item.dishId,
+    dishName: item.dishName,
+    skuId: item.skuId,
+    skuName: item.skuName,
+    options: item.options,
+    optionsText: item.optionsText,
+    price: item.price,
+    quantity: item.quantity,
+    packageFee: item.packageFee,
+    desc: item.desc,
+    icon: item.dishImg
+  }))
+}
+
+function mergeMeta(base = {}, incoming = {}) {
+  return Object.assign({}, base || {}, incoming || {})
 }
 
 module.exports = {
-	async preview(payload = {}) {
-		const sessionId = payload.sessionId || 'local'
-		const cart = await loadCart(sessionId)
-		let items = normalizeItems(payload.items)
-		if ((!items || !items.length) && cart && Array.isArray(cart.items)) {
-			items = normalizeItems(cart.items)
-		}
-		if (!items.length) {
-			throw new Error('cart is empty')
-		}
-		const fees = payload.fees || {}
-		const promotion = payload.promotion || {}
-		const amountDetail = calcAmountDetail(items, fees, promotion)
-		const tableInfo = await fetchTableInfo(cart, payload)
-		const response = {
-			sessionId,
-			channel: payload.channel || (cart && cart.channel) || 'dine_in',
-			restaurantId: payload.restaurantId || (cart && cart.restaurant_id) || 'default',
-			items,
-			participants: (cart && cart.participants) || [],
-			tableInfo,
-			settleInfo: {
-				tableInfo,
-				address: payload.address || null,
-				contact: payload.contact || null,
-				invoice: payload.invoice || null,
-				remark: payload.remark || ''
-			},
-			amountDetail,
-			feeDetail: {
-				packageFee: amountDetail.package + amountDetail.service,
-				deliveryFee: amountDetail.delivery,
-				discount: amountDetail.discount,
-				payable: amountDetail.payable
-			},
-			discountDetail: amountDetail.discountDetail
-		}
-		return response
-	},
-	async submit(payload = {}) {
-		const previewResult = await this.preview(payload)
-		const orderCo = uniCloud.importObject('order')
-		const orderPayload = {
-			sessionId: payload.sessionId || 'local',
-			restaurantId: previewResult.restaurantId,
-			channel: previewResult.channel,
-			tableInfo: previewResult.tableInfo,
-			peopleCount: payload.peopleCount || (previewResult.tableInfo && previewResult.tableInfo.peopleCount) || 0,
-			address: payload.address || (previewResult.settleInfo && previewResult.settleInfo.address) || null,
-			remark: payload.remark || (previewResult.settleInfo && previewResult.settleInfo.remark) || '',
-			invoice: payload.invoice || (previewResult.settleInfo && previewResult.settleInfo.invoice) || {},
-			utensilsCount: payload.utensilsCount || 0,
-			feeDetail: previewResult.feeDetail,
-			itemsSnapshot: buildSnapshotItems(previewResult.items),
-			couponId: payload.coupon && payload.coupon.couponId || '',
-			restaurantId: previewResult.restaurantId,
-			meta: Object.assign({}, payload.meta || {}, {
-				discountDetail: previewResult.discountDetail,
-				serviceFee: previewResult.amountDetail.service
-			})
-		}
-		const orderRes = await orderCo.createFromCart(orderPayload)
-		return {
-			orderNo: orderRes.orderNo,
-			amountDetail: previewResult.amountDetail,
-			order: orderRes.order
-		}
-	}
+  async preview(payload = {}) {
+    const sessionId = ensureString(payload.sessionId || payload.session_id || 'local')
+    const cart = await loadCart(sessionId)
+    const itemsSource = Array.isArray(payload.items) && payload.items.length ? payload.items : cart && cart.items
+    const items = normalizeItems(itemsSource)
+    if (!items.length) {
+      throw new Error('cart is empty')
+    }
+    const channel = payload.channel || (cart && cart.channel) || 'dine_in'
+    let tableInfo = payload.tableInfo || (cart && cart.table_info) || null
+    if (!tableInfo) {
+      const tableNo = payload.tableNo || (cart && cart.table_no) || ''
+      const session = await loadTableSession(tableNo)
+      if (session) {
+        tableInfo = {
+          tableNo: tableNo || session.table_no,
+          sessionId: session._id,
+          status: session.status,
+          people_count: session.people_count
+        }
+      } else if (tableNo) {
+        tableInfo = { tableNo }
+      }
+    }
+    const feeRef = mergeMeta(cart && cart.meta && cart.meta.feeDetail, payload.feeDetail)
+    const feeDetail = calcFeeDetail(items, feeRef, channel)
+    const remark = payload.remark !== undefined ? payload.remark : (cart && cart.remark) || ''
+    const meta = mergeMeta(cart && cart.meta, payload.meta)
+    const peopleCount = resolvePeopleCount(payload, cart, tableInfo)
+    return {
+      sessionId,
+      channel,
+      restaurantId: payload.restaurantId || (cart && cart.restaurant_id) || 'default',
+      items,
+      participants: (cart && cart.participants) || [],
+      tableInfo,
+      feeDetail,
+      amountDetail: feeDetail,
+      remark,
+      peopleCount,
+      address: payload.address || null,
+      invoice: payload.invoice || {},
+      meta,
+      utensilsCount: Number(payload.utensilsCount || 0)
+    }
+  },
+  async submit(payload = {}) {
+    const preview = await this.preview(payload)
+    const orderObj = uniCloud.importObject('order')
+    const orderPayload = {
+      sessionId: preview.sessionId,
+      restaurantId: preview.restaurantId,
+      channel: preview.channel,
+      tableInfo: preview.tableInfo,
+      peopleCount: preview.peopleCount,
+      remark: payload.remark !== undefined ? payload.remark : preview.remark,
+      address: payload.address || null,
+      invoice: payload.invoice || preview.invoice || {},
+      utensilsCount: payload.utensilsCount || preview.utensilsCount || 0,
+      itemsSnapshot: buildSnapshotItems(preview.items),
+      feeDetail: {
+        packageFee: preview.feeDetail.packageFee,
+        deliveryFee: preview.feeDetail.deliveryFee + preview.feeDetail.serviceFee,
+        discount: preview.feeDetail.discount,
+        payable: preview.feeDetail.payable
+      },
+      couponId: payload.couponId || payload.selectedCouponId || '',
+      meta: mergeMeta(preview.meta, payload.meta)
+    }
+    const orderRes = await orderObj.createFromCart(orderPayload)
+    return {
+      orderNo: orderRes.orderNo,
+      order: orderRes.order,
+      preview
+    }
+  }
 }

@@ -20,7 +20,7 @@
 | 编号 | 功能 | 前端入口 | 核心云对象/服务 |
 | --- | --- | --- | --- |
 | F1~F3 | 点餐、菜品详情、购物车 | `pages/menu/menu.vue` | `dish`、`cart` |
-| F4~F9 | 购物车、结算、订单创建、订单中心 | `subPack/index/indexSettlement.vue`、`pages/order/order.vue` | `cart`、`order`、`paymentService`（模拟）、`review` |
+| F4~F9 | 购物车、多人拼单、结算、订单中心 | `pages/menu/menu.vue`、`subPack/index/indexSettlement.vue`、`pages/order/order.vue` | `cart`、`checkout`、`order`、`paymentService`（模拟）、`review` |
 | F10 | 厨房/备餐通知 | `subPack/order/orderDetail.vue` | `kitchen` |
 | F11~F13 | 桌台/外卖、排队、配送策略 | `pages/index/index.vue`、`pages/menu/menu.vue`、`subPack/index/indexSettlement.vue` | `table`、`queue`、`delivery` |
 | F14~F17 | 会员、积分、优惠券、积分商城 | `pages/my/my.vue`、`subPack/member/pointLedger.vue` | `member`、`coupon`、`point_goods` |
@@ -50,7 +50,7 @@
 ### 3.3 结算页 `subPack/index/indexSettlement.vue`
 - **堂食模式**：显示桌号、用餐人数、套餐时间、备注、优惠券、餐具、发票等表单。
 - **外卖模式**：地址簿支持新增/删除/默认/“新增”标签，仅最近创建的地址保留红标；手机号只能输入数字且必须为 11 位（输入过滤 + blur 校验 + 保存校验）。删除按钮固定在地址行最右侧。
-- 费用明细根据餐品金额、打包费、配送费、优惠券自动计算；提交成功写入 `checkoutProfile` 以便下次回填。
+- 费用明细根据餐品金额、打包费、配送费、优惠券自动计算；提交成功写入 `checkoutProfile` 以便下次回填，下单统一通过 `checkout.preview/submit` 云对象完成，自动附带桌台/参与者/用餐人数并输出打包、配送/服务费与优惠拆分。
 - 支付流程目前模拟调用 `paymentService.mockPay`，可按 README 的微信支付章节切换 uni-pay 真实支付。
 
 ### 3.4 订单模块
@@ -78,6 +78,7 @@
 | --- | --- | --- | --- |
 | `dish` | `listCategories/list/detail/listRecommend/search` | `dish`、`dish_category` | 读取 `common/menu.js` |
 | `cart` | `sync/get/clear` | `cart_session` | 本地 `menuCartData` |
+| `checkout` | `preview/submit` | 依赖 `cart_sessions` + `table_session` | 退化为直接读取本地购物车快照 |
 | `order` | `create/list/detail/updateStatus` | `order`、`order_item`、`order_status_log` | 本地 `mockOrders` |
 | `member` | `login/profile/signIn/exchangeGoods/fetchPointLedger` | `user_profile`、`point_ledger`、`point_goods` | `memberProfileMock` |
 | `coupon` | `listTemplate/listUsable/claim/use` | `coupon_template`、`coupon` | `couponMockList` |
@@ -158,6 +159,7 @@
 6. **运营位**：在云端 `operation_slot` 中修改 banner/卡片内容，刷新首页与“我的”页观察实时变更。
 7. **埋点**：真机执行搜索/点击操作，查看 `analytics_event` 集合或本地 mock 是否生成记录。
 8. **支付/厨房**：完成一次“支付”后，在 `order`、`kitchen_ticket`、`order_status_log` 中验证记录，并在订单详情查看备餐进度。
+- **端到端清单**：参考 `docs/cart-checkout-tests.md` 中的脚本，可一次性验证 F4~F6（多人拼单→购物车同步→结算预览→下单→清空）的全链路行为。
 
 ---
 

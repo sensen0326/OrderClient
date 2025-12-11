@@ -8,6 +8,7 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 static/
+docs/
 
 # HBuilderX / uni-app 构建产物
 dist/
