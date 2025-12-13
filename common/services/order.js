@@ -79,6 +79,8 @@ function buildLocalOrder(orderNo, payload = {}) {
 		amount_detail: amountDetail,
 		items_count: items.reduce((sum, item) => sum + (item.value || 0), 0),
 		items_snapshot: items,
+		member_id: payload.memberId || (payload.memberProfile && payload.memberProfile.userId) || '',
+		member_snapshot: payload.memberProfile || null,
 		remark: payload.remark || '',
 		people_count: Number(payload.peopleCount || 0),
 		meals_time: payload.mealsTime || '',
@@ -123,6 +125,9 @@ const orderService = {
 			if (status) {
 				filtered = filtered.filter(item => item.order_status === status)
 			}
+			if (params.memberId) {
+				filtered = filtered.filter(item => item.member_id === params.memberId)
+			}
 			if (keyword) {
 				filtered = filtered.filter(item => (item.order_no || '').toLowerCase().includes(keyword.toLowerCase()))
 			}
@@ -139,6 +144,9 @@ const orderService = {
 			const list = readLocalOrders()
 			const order = list.find(item => item.order_no === orderNo)
 			if (!order) {
+				throw new Error(ERROR_TEXT.notFound)
+			}
+			if (params.memberId && order.member_id && order.member_id !== params.memberId) {
 				throw new Error(ERROR_TEXT.notFound)
 			}
 			return {

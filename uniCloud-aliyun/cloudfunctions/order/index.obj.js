@@ -34,6 +34,7 @@ function normalizeOrderItems(cartItems = [], orderNo = '') {
 			options: Array.isArray(item.options) ? item.options : [],
 			options_text: item.optionsText || '',
 			desc: item.desc || '',
+			dish_img: item.dishImg || item.dish_img || item.icon || item.cover || '',
 			unit_price: unitPrice,
 			quantity,
 			amount: Number((unitPrice * quantity).toFixed(2)),
@@ -74,7 +75,7 @@ function buildSnapshotItems(items = []) {
 		dishId: item.dish_id || item.dishId || '',
 		name: item.dish_name || item.dishName || '',
 		desc: item.desc || '',
-		icon: item.dishImg || item.icon || '',
+		icon: item.dishImg || item.dish_img || item.icon || item.cover || '',
 		skuName: item.sku_name || item.skuName || '',
 		optionsText: item.options_text || item.optionsText || '',
 		price: Number(item.unit_price || item.price || 0),
@@ -100,26 +101,32 @@ module.exports = {
 		}
 		const amountDetail = calcAmountDetail(orderItems, payload.feeDetail || {})
 		const now = Date.now()
-		const orderDoc = {
-			_id: orderNo,
-			order_no: orderNo,
-			session_id: sessionId,
-			restaurant_id: (cart && cart.restaurant_id) || payload.restaurantId || 'default',
-			channel: payload.channel || (cart && cart.channel) || 'dine_in',
-			table_no: (payload.tableInfo && payload.tableInfo.tableNo) || (cart && cart.table_no) || '',
-			address: payload.address || null,
-			people_count: Number(payload.peopleCount || 0),
-			remark: payload.remark || (cart && cart.remark) || '',
-			pay_status: 'pending',
-			fulfill_status: 'pending',
-			order_status: 'pending',
-			amount_detail: amountDetail,
-			items_count: orderItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-			items_snapshot: payload.itemsSnapshot ? buildSnapshotItems(payload.itemsSnapshot) : buildSnapshotItems(orderItems),
-			invoice: payload.invoice || {},
-			utensils_count: Number(payload.utensilsCount || 0),
-			meals_time: payload.mealsTime || '',
-			coupon_id: payload.couponId || '',
+	const snapshotSource =
+		Array.isArray(payload.itemsSnapshot) && payload.itemsSnapshot.length
+			? payload.itemsSnapshot
+			: cartSourceItems
+	const orderDoc = {
+		_id: orderNo,
+		order_no: orderNo,
+		session_id: sessionId,
+		restaurant_id: (cart && cart.restaurant_id) || payload.restaurantId || 'default',
+		channel: payload.channel || (cart && cart.channel) || 'dine_in',
+		table_no: (payload.tableInfo && payload.tableInfo.tableNo) || (cart && cart.table_no) || '',
+		address: payload.address || null,
+		people_count: Number(payload.peopleCount || 0),
+		remark: payload.remark || (cart && cart.remark) || '',
+		pay_status: 'pending',
+		fulfill_status: 'pending',
+		order_status: 'pending',
+		amount_detail: amountDetail,
+		items_count: orderItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+		items_snapshot: buildSnapshotItems(snapshotSource),
+		member_id: payload.memberId || (payload.memberProfile && payload.memberProfile.userId) || '',
+		member_snapshot: payload.memberProfile || null,
+		invoice: payload.invoice || {},
+		utensils_count: Number(payload.utensilsCount || 0),
+		meals_time: payload.mealsTime || '',
+		coupon_id: payload.couponId || '',
 			meta: payload.meta || {},
 			created_at: now,
 			updated_at: now
@@ -149,17 +156,21 @@ module.exports = {
 		const page = Math.max(1, Number(params.page) || 1)
 		const pageSize = Math.min(50, Math.max(1, Number(params.pageSize) || 10))
 		const where = {}
-		if (params.sessionId) {
-			where.session_id = params.sessionId
-		}
-		if (params.status) {
-			where.order_status = params.status
-		}
-		const keyword = (params.keyword || params.orderNo || '').trim()
-		if (keyword) {
-			where.order_no = dbCmd.regex({
-				regex: keyword,
-				options: 'i'
+	if (params.sessionId) {
+		where.session_id = params.sessionId
+	}
+	if (params.status) {
+		where.order_status = params.status
+	}
+	const memberId = params.memberId || params.userId
+	if (memberId) {
+		where.member_id = memberId
+	}
+	const keyword = (params.keyword || params.orderNo || '').trim()
+	if (keyword) {
+		where.order_no = dbCmd.regex({
+			regex: keyword,
+			options: 'i'
 			})
 		}
 		const res = await db.collection(ORDER_COLLECTION)
@@ -182,7 +193,10 @@ module.exports = {
 		if (!orderRes.data || !orderRes.data.length) {
 			throw new Error('order not found')
 		}
-		const order = orderRes.data[0]
+	const order = orderRes.data[0]
+	if (params.memberId && order.member_id && order.member_id !== params.memberId) {
+		throw new Error('order not found')
+	}
 		const itemsRes = await db.collection(ORDER_ITEM_COLLECTION).where({
 			order_no: orderNo
 		}).get()

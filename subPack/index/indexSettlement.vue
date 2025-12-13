@@ -290,16 +290,39 @@
 	</view>
   </template>
   
-  <script>
-  import orderService from '@/common/services/order.js'
-  import paymentService from '@/common/services/payment.js'
-  import cartService from '@/common/services/cart.js'
-  import deliveryService from '@/common/services/delivery.js'
-  import kitchenService from '@/common/services/kitchen.js'
-  import memberService from '@/common/services/member.js'
-  import couponService from '@/common/services/coupon.js'
-  
-  export default {
+<script>
+import paymentService from '@/common/services/payment.js'
+import cartService from '@/common/services/cart.js'
+import deliveryService from '@/common/services/delivery.js'
+import kitchenService from '@/common/services/kitchen.js'
+import memberService from '@/common/services/member.js'
+import couponService from '@/common/services/coupon.js'
+import checkoutService from '@/common/services/checkout.js'
+
+const CDN_BASE_URL = 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage'
+const DEFAULT_DISH_IMAGE = `${CDN_BASE_URL}/static/menu/index-dining.png`
+const HTTP_URL_REG = /^https?:\/\//i
+
+function resolveMediaUrl(url = '') {
+  if (!url) return ''
+  if (HTTP_URL_REG.test(url)) return url
+  if (url.startsWith('/')) {
+    return `${CDN_BASE_URL}${url}`
+  }
+  return `${CDN_BASE_URL}/${url.replace(/^\/+/, '')}`
+}
+
+function ensureDishImage(...sources) {
+  for (const src of sources) {
+    if (src) {
+      const resolved = resolveMediaUrl(src)
+      if (resolved) return resolved
+    }
+  }
+  return DEFAULT_DISH_IMAGE
+}
+
+export default {
 	data() {
 	  return {
 		subCurrent: 0,
@@ -437,7 +460,7 @@
 	  }
 	},
 	watch: {
-	  orderList: {
+		orderList: {
 		handler() {
 		  this.calcFeeDetail()
 		  this.scheduleCouponFetch()
@@ -533,7 +556,38 @@
 		}
 	  }
 	},
-	methods: {
+ 	methods: {
+	  getMemberSnapshot() {
+		const profile = this.memberProfile || memberService.getStoredProfile() || null
+		if (profile && profile.userId) {
+		  return {
+			userId: profile.userId,
+			nickname: profile.nickname || '',
+			avatar: profile.avatar || ''
+		  }
+		}
+		return null
+	  },
+	  ensureMemberProfile() {
+		const snapshot = this.getMemberSnapshot()
+		if (snapshot) {
+		  return snapshot
+		}
+		uni.showModal({
+		  title: '需要登录',
+		  content: '请登录后再提交订单',
+		  confirmText: '去登录',
+		  cancelText: '稍后再说',
+		  success: (res) => {
+			if (res.confirm) {
+			  uni.switchTab({
+				url: '/pages/my/my'
+			  })
+			}
+		  }
+		})
+		return null
+	  },
 	  noop() {},
 	  handleLeaveInput(e) {
 		this.form.leave = e && e.detail ? e.detail.value : ''
@@ -763,22 +817,42 @@
 	  buildOrderItemsSnapshot() {
 		return this.orderList
 		  .filter((item) => Number(item.value || 0) > 0)
-		  .map((item) => ({
-			dishId: item.dishId || '',
-			dishName: item.name || item.dishName || '',
-			name: item.name || item.dishName || '',
-			desc: item.desc || '',
-			icon: item.icon || item.dishImg || '',
-			skuId: item.skuId || '',
-			skuName: item.skuName || '',
-			optionsText: item.optionsText || '',
-			options: item.options || [],
-			price: Number(item.price || 0),
-			value: Number(item.value || 0),
-			quantity: Number(item.value || 0)
-		  }))
+		  .map((item) => {
+			const icon = ensureDishImage(item.icon, item.dishImg, item.cover)
+			return {
+			  dishId: item.dishId || '',
+			  dishName: item.name || item.dishName || '',
+			  name: item.name || item.dishName || '',
+			  desc: item.desc || '',
+			  icon,
+			  skuId: item.skuId || '',
+			  skuName: item.skuName || '',
+			  optionsText: item.optionsText || '',
+			  options: item.options || [],
+			  price: Number(item.price || 0),
+			  packageFee: Number(item.packageFee || 0),
+			  value: Number(item.value || 0),
+			  quantity: Number(item.value || 0)
+			}
+		  })
 	  },
 	  buildOrderPayload() {
+		const memberSnapshot = this.getMemberSnapshot()
+		const itemsSnapshot = this.buildOrderItemsSnapshot()
+		const inlineItems = this.orderList.map((item) => ({
+		  key: item.id || item.key || `${item.dishId || ''}_${item.skuId || ''}`,
+		  dishId: item.dishId || '',
+		  dishName: item.name || item.dishName || '',
+		  skuId: item.skuId || '',
+		  skuName: item.skuName || '',
+		  quantity: Number(item.value || 0),
+		  price: Number(item.price || 0),
+		  options: item.options || [],
+		  optionsText: item.optionsText || '',
+		  packageFee: Number(item.packageFee || 0),
+		  desc: item.desc || '',
+		  dishImg: ensureDishImage(item.icon, item.dishImg, item.cover)
+		}))
 		return {
 		  sessionId: this.sessionId || uni.getStorageSync('cartSessionId') || 'local',
 		  channel: this.cartChannel,
@@ -791,13 +865,21 @@
 		  invoice: this.invoiceInfo.needInvoice ? { ...this.invoiceInfo } : {},
 		  address:
 			this.cartChannel === 'takeout' ? (this.selectedAddress ? { ...this.selectedAddress } : null) : null,
-		  itemsSnapshot: this.buildOrderItemsSnapshot(),
+		  itemsSnapshot,
+		  items: inlineItems,
+		  memberId: memberSnapshot ? memberSnapshot.userId : '',
+		  memberProfile: memberSnapshot || null,
 		  feeDetail: {
 			goods: Number(this.feeDetail.goodsTotal || 0),
 			packageFee: Number(this.feeDetail.packageFee || 0),
 			deliveryFee: Number(this.feeDetail.deliveryFee || 0),
 			discount: Number(this.feeDetail.discount || 0),
 			payable: Number(this.feeDetail.payable || 0)
+		  },
+		  meta: {
+			memberId: memberSnapshot ? memberSnapshot.userId : '',
+			memberNickname: memberSnapshot ? memberSnapshot.nickname : '',
+			channel: this.cartChannel
 		  }
 		}
 	  },
@@ -826,6 +908,7 @@
   
 	  async confirmPay() {
 		if (this.submitLoading) return
+		if (!this.ensureMemberProfile()) return
 		if (this.cartChannel === 'dine_in' && !this.form.people) {
 		  this.$u.toast('请选择用餐人数')
 		  return
@@ -838,12 +921,11 @@
 		  this.$u.toast(this.deliveryWarning)
 		  return
 		}
-		const itemsSnapshot = this.buildOrderItemsSnapshot()
-		if (!itemsSnapshot.length) {
+		const payload = this.buildOrderPayload()
+		if (!payload.itemsSnapshot || !payload.itemsSnapshot.length) {
 		  this.$u.toast('请重新选择菜品')
 		  return
 		}
-		const payload = this.buildOrderPayload()
 		this.submitLoading = true
 		uni.showLoading({
 		  title: '正在创建订单',
@@ -851,7 +933,7 @@
 		})
 		let orderNo = ''
 		try {
-		  const res = await orderService.createFromCart(payload)
+		  const res = await checkoutService.submit(payload)
 		  orderNo = res.orderNo || (res.order && (res.order.order_no || res.order.orderNo)) || ''
 		  if (!orderNo) {
 			throw new Error('订单信息异常')
@@ -877,7 +959,7 @@
 				channel: payload.channel,
 				tableInfo: payload.tableInfo,
 				peopleCount: payload.peopleCount,
-				itemsSnapshot,
+				itemsSnapshot: payload.itemsSnapshot,
 				markPaid: true
 			  })
 			} catch (kitchenErr) {
@@ -892,7 +974,7 @@
 			  })
 			} else {
 			  uni.redirectTo({
-				url: `/subPack/order/orderDetail?orderNo=${orderNo}`
+				url: `/pages/order/detail?orderNo=${orderNo}`
 			  })
 			}
 		  }, 400)

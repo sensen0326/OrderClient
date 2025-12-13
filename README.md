@@ -11,7 +11,7 @@
 | 前端 | `uni-app` 小程序工程，主要页面位于 `pages/`，结算/订单详情等放在 `subPack/`。UI 统一使用 `uni_modules/uview-ui`。 |
 | 云服务 | `uniCloud` 云对象 + Schema：共计 `dish`、`cart`、`order`、`member`、`coupon`、`queue`、`table`、`delivery`、`kitchen`、`support`、`message`、`analytics`、`operation` 等十余个云对象；所有 schema 位于 `uniCloud-aliyun/database/`。 |
 | 本地降级 | `common/services/*.js` 会优先调用云对象，失败时自动切换到本地 mock（如 `common/menu.js`、`menuCartData` 缓存），保证在未部署云端时也能完整体验。 |
-| 资源配置 | `app.config.js` 集中管理 AppID/AppSecret，`scripts/sync-weapp-config.js` 用于同步 `manifest.json` / `project.config.json`，云对象可读取相同配置。 |
+| 资源配置 | `app.config.js` 集中管理 AppID/AppSecret，`scripts/sync-weapp-config.js` 用于同步 `manifest.json` / `project.config.json`，云对象可读取相同配置；后台侧栏菜单定义在 `pages/system/menu/originalMenuList.json`，便于快速定位「订单中心」等新增页面。 |
 
 ---
 
@@ -20,11 +20,11 @@
 | 编号 | 功能 | 前端入口 | 核心云对象/服务 |
 | --- | --- | --- | --- |
 | F1~F3 | 点餐、菜品详情、购物车 | `pages/menu/menu.vue` | `dish`、`cart` |
-| F4~F9 | 购物车、多人拼单、结算、订单中心 | `pages/menu/menu.vue`、`subPack/index/indexSettlement.vue`、`pages/order/order.vue` | `cart`、`checkout`、`order`、`paymentService`（模拟）、`review` |
-| F10 | 厨房/备餐通知 | `subPack/order/orderDetail.vue` | `kitchen` |
+| F4~F9 | 购物车、多人拼单、结算、订单中心 | `pages/menu/menu.vue`、`subPack/index/indexSettlement.vue`、`pages/order/list.vue`、`pages/order/detail.vue` | `cart`、`checkout`、`order`、`paymentService`（模拟）、`review` |
+| F10 | 厨房/备餐通知 | `pages/order/detail.vue` | `kitchen` |
 | F11~F13 | 桌台/外卖、排队、配送策略 | `pages/index/index.vue`、`pages/menu/menu.vue`、`subPack/index/indexSettlement.vue` | `table`、`queue`、`delivery` |
 | F14~F17 | 会员、积分、优惠券、积分商城 | `pages/my/my.vue`、`subPack/member/pointLedger.vue` | `member`、`coupon`、`point_goods` |
-| F18~F20 | 评价、售后、消息中心 | `subPack/order/orderDetail.vue`、`subPack/service/supportCenter.vue`、`subPack/service/messageCenter.vue` | `review`、`support`、`message` |
+| F18~F20 | 评价、售后、消息中心 | `pages/order/detail.vue`、`subPack/service/supportCenter.vue`、`subPack/service/messageCenter.vue` | `review`、`support`、`message` |
 | F21~F22 | 运营配置、数据埋点 | `pages/index/index.vue`、`pages/my/my.vue` | `operation`、`analytics` |
 | **F23** | uniCloud 服务网关 | 统一由 `service.call` 间接访问 | `service` |
 
@@ -54,8 +54,8 @@
 - 支付流程目前模拟调用 `paymentService.mockPay`，可按 README 的微信支付章节切换 uni-pay 真实支付。
 
 ### 3.4 订单模块
-- `pages/order/order.vue` 列表支持堂食/外卖标识、菜品摘要、订单金额、支付状态、催单/再来一单按钮，并与评价/售后流程联动。
-- `subPack/order/orderDetail.vue` 显示菜品明细、费用、桌台、配送地址、支付状态、备注、发票；若订单处于制作中，会展示厨房备餐进度时间线，并提供评价入口。
+- `pages/order/list.vue` 列表支持堂食/外卖标识、菜品摘要、订单金额、支付状态、催单/再来一单按钮，并与评价/售后流程联动。
+- `pages/order/detail.vue` 显示菜品明细、费用、桌台、配送地址、支付状态、备注、发票；若订单处于制作中，会展示厨房备餐进度时间线，并提供评价入口。
 - `subPack/order/reviewSubmit.vue` 负责菜品/服务评价，支持打分 + 图片上传（模拟） + 文本填写；提交后 `review` 集合会记录，按钮状态随之改变。
 
 ### 3.5 我的 `pages/my/my.vue`
@@ -159,7 +159,7 @@
 6. **运营位**：在云端 `operation_slot` 中修改 banner/卡片内容，刷新首页与“我的”页观察实时变更。
 7. **埋点**：真机执行搜索/点击操作，查看 `analytics_event` 集合或本地 mock 是否生成记录。
 8. **支付/厨房**：完成一次“支付”后，在 `order`、`kitchen_ticket`、`order_status_log` 中验证记录，并在订单详情查看备餐进度。
-- **端到端清单**：参考 `docs/cart-checkout-tests.md` 中的脚本，可一次性验证 F4~F6（多人拼单→购物车同步→结算预览→下单→清空）的全链路行为。
+- **端到端清单**：参考 `docs/cart-checkout-tests.md`（F4~F6）及 `docs/order-payment-tests.md`（F7~F10）脚本，覆盖多人拼单→购物车同步→结算预览→下单→支付→订单中心操作→推送后厨的整条链路。
 
 ---
 

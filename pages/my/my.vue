@@ -188,7 +188,7 @@ import authService from '@/common/services/auth.js'
 import operationService from '@/common/services/operation.js'
 import analyticsService from '@/common/services/analytics.js'
 
-const TAB_PAGES = ['/pages/index/index', '/pages/menu/menu', '/pages/order/order', '/pages/my/my']
+const TAB_PAGES = ['/pages/index/index', '/pages/menu/menu', '/pages/order/list', '/pages/my/my']
 
 export default {
 	data() {

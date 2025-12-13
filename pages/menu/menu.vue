@@ -88,7 +88,7 @@
 					:key="item._id"
 					@click="openDishFromRecommend(item)"
 				>
-					<image :src="item.cover" mode="aspectFill"></image>
+					<image :src="item.cover || defaultDishCover" mode="aspectFill"></image>
 					<view class="recommend-card__name">{{ item.name }}</view>
 					<view class="recommend-card__price">
 						<text>￥</text>{{ formatPrice(getFirstSkuPrice(item)) }}
@@ -387,15 +387,49 @@
 	import dishService from '@/common/services/dish.js'
 	import cartService from '@/common/services/cart.js'
 	import tableService from '@/common/services/table.js'
+	import memberService from '@/common/services/member.js'
+
+	const CDN_BASE_URL = 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage'
+	const DEFAULT_DISH_IMAGE = `${CDN_BASE_URL}/static/menu/index-dining.png`
+	const HTTP_URL_REG = /^https?:\/\//i
+	function pickMediaValue(source) {
+		if (!source) return ''
+		if (typeof source === 'string') return source
+		if (typeof source === 'object' && source.url) return source.url
+		return ''
+	}
+
+	function resolveMediaUrl(url = '') {
+		if (!url) return ''
+		if (HTTP_URL_REG.test(url)) return url
+		if (url.startsWith('/')) {
+			return `${CDN_BASE_URL}${url}`
+		}
+		return `${CDN_BASE_URL}/${url.replace(/^\/+/, '')}`
+	}
+
+	function ensureDishImage(...sources) {
+		for (const src of sources) {
+			const value = pickMediaValue(src)
+			if (value) {
+				const resolved = resolveMediaUrl(value)
+				if (resolved) return resolved
+			}
+		}
+		return DEFAULT_DISH_IMAGE
+	}
 	export default {
 		data() {
 			return {
 				PopupShow: false,
 				categories: [],
 				dishesByCategory: {},
+				defaultDishCover: DEFAULT_DISH_IMAGE,
 				restaurantId: 'default',
 				restaurantName: '私房菜（万达广场店）',
 				tableInfo: null,
+				memberProfile: memberService.getStoredProfile() || null,
+				cartClientId: uni.getStorageSync('cartClientId') || '',
 				scrollTop: 0,
 				current: 0,
 				menuHeight: 0,
@@ -542,8 +576,91 @@
 				uni.removeStorageSync('menuTargetDish')
 				this.highlightDish(targetDish)
 			}
+			const latestProfile = memberService.getStoredProfile() || null
+			if (
+				(latestProfile && (!this.memberProfile || this.memberProfile.userId !== latestProfile.userId)) ||
+				(!latestProfile && this.memberProfile)
+			) {
+				this.memberProfile = latestProfile
+			}
+			if (!this.cartClientId) {
+				this.cartClientId = this.ensureCartClientId()
+			}
 		},
 		methods: {
+			decorateCategory(raw) {
+				if (!raw) return raw
+				return {
+					...raw,
+					icon: ensureDishImage(raw.icon)
+				}
+			},
+			decorateDish(raw) {
+				if (!raw) return raw
+				const cover = ensureDishImage(raw.cover, raw.icon, raw.image, raw?.gallery && raw.gallery[0])
+				return {
+					...raw,
+					cover,
+					icon: cover
+				}
+			},
+			getMemberSnapshot() {
+				const profile = this.memberProfile || memberService.getStoredProfile() || null
+				if (profile && profile.userId) {
+					return {
+						userId: profile.userId,
+						nickname: profile.nickname || '',
+						avatar: profile.avatar || ''
+					}
+				}
+				return null
+			},
+			ensureCartClientId() {
+				let clientId = this.cartClientId || uni.getStorageSync('cartClientId')
+				if (!clientId) {
+					clientId = `client_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+					uni.setStorageSync('cartClientId', clientId)
+				}
+				this.cartClientId = clientId
+				return clientId
+			},
+			buildCartActor() {
+				const snapshot = this.getMemberSnapshot()
+				if (snapshot) {
+					return {
+						user_id: snapshot.userId,
+						nickname: snapshot.nickname,
+						avatar: snapshot.avatar,
+						role: 'member'
+					}
+				}
+				const clientId = this.ensureCartClientId()
+				return {
+					client_id: clientId,
+					nickname: '游客',
+					role: 'guest'
+				}
+			},
+			ensureMemberLogin() {
+				const snapshot = this.getMemberSnapshot()
+				if (snapshot) {
+					return snapshot
+				}
+				uni.showModal({
+					title: '需要登录',
+					content: '请先登录账号再继续点餐',
+					confirmText: '去登录',
+					cancelText: '再看看',
+					success: (res) => {
+						if (res.confirm) {
+							uni.switchTab({
+								url: '/pages/my/my'
+							})
+						}
+					}
+				})
+				return null
+			},
 			async initCartSession() {
 				let storedSession = uni.getStorageSync('cartSessionId')
 				if (!storedSession) {
@@ -622,11 +739,13 @@
 					if (!qty || qty <= 0) return
 					const optionKey = this.buildOptionsKey(item.options || [])
 					const key = item.key || this.buildCartKey(item.dishId, item.skuId, optionKey)
+				const dishImg = ensureDishImage(item.dishImg, item.dish_img, item.icon, item.cover)
 					nextMap[key] = {
 						...item,
 						key,
 						quantity: qty,
-						price: Number(item.price || 0)
+						price: Number(item.price || 0),
+						dishImg
 					}
 				})
 				this.cartMap = nextMap
@@ -667,6 +786,8 @@
 			},
 			buildCartPayload() {
 				const items = this.cartItems.filter(item => Number(item.quantity) > 0)
+				const memberSnapshot = this.getMemberSnapshot()
+				const actor = this.buildCartActor()
 				return {
 					sessionId: this.cartSessionId || 'local',
 					items,
@@ -674,9 +795,13 @@
 					channel: this.getCartChannel(),
 					tableNo: this.tableInfo && this.tableInfo.tableNo ? this.tableInfo.tableNo : '',
 					meta: {
-						restaurantName: this.restaurantName
+						restaurantName: this.restaurantName,
+						memberId: memberSnapshot ? memberSnapshot.userId : '',
+						memberNickname: memberSnapshot ? memberSnapshot.nickname : '',
+						memberProfile: memberSnapshot || null
 					},
-					updated_at: Date.now()
+					updated_at: Date.now(),
+					actor
 				}
 			},
 			persistCartLocal() {
@@ -726,9 +851,9 @@
 					const categories = await dishService.listCategories({
 						restaurantId: this.restaurantId
 					})
-					this.categories = categories
-					if (categories.length) {
-						await this.fetchDishes(categories[0]._id, {
+					this.categories = (categories || []).map(cat => this.decorateCategory(cat))
+					if (this.categories.length) {
+						await this.fetchDishes(this.categories[0]._id, {
 							force: true
 						})
 					}
@@ -746,7 +871,7 @@
 						restaurantId: this.restaurantId,
 						limit: 6
 					})
-					this.recommendList = res || []
+					this.recommendList = (res || []).map(item => this.decorateDish(item))
 				} catch (err) {
 					console.warn('fetch recommend failed', err)
 				}
@@ -769,7 +894,8 @@
 						params.tag = activeFilter.key
 					}
 					const res = await dishService.list(params)
-					this.$set(this.dishesByCategory, categoryId, res.list || [])
+					const normalized = (res.list || []).map(dish => this.decorateDish(dish))
+					this.$set(this.dishesByCategory, categoryId, normalized)
 				} catch (err) {
 					console.error('fetch dishes error', err)
 					this.errorMsg = err.message || '菜单加载失败'
@@ -840,11 +966,12 @@
 					this.handleCartChanged()
 					return
 				}
+				const dishImg = ensureDishImage(dish.cover, dish.icon, exist?.dishImg)
 				const payload = {
 					key,
 					dishId: dish._id,
 					dishName: dish.name,
-					dishImg: dish.cover,
+					dishImg,
 					skuId: sku.sku_id,
 					skuName: sku.name,
 					options,
@@ -949,23 +1076,35 @@
 				if (!this.menuNum || !this.menuPrice) {
 					return
 				}
+				const snapshot = this.ensureMemberLogin()
+				if (!snapshot) {
+					return
+				}
 				const orderItems = this.cartItems.map(item => ({
 					id: item.key,
 					dishId: item.dishId,
+					skuId: item.skuId,
+					options: item.options || [],
 					name: item.dishName,
 					desc: item.desc,
-					icon: item.dishImg,
+					icon: ensureDishImage(item.dishImg, item.cover),
 					skuName: item.skuName,
 					optionsText: item.optionsText,
 					price: item.price,
-					value: item.quantity
+					value: item.quantity,
+					packageFee: item.packageFee || 0
+				}))
+				const normalizedItems = orderItems.map(entry => ({
+					...entry,
+					icon: ensureDishImage(entry.icon, entry.dishImg)
 				}))
 				const payload = {
-					order: orderItems,
+					order: normalizedItems,
 					menuPrice: this.menuPrice,
 					menuNum: this.menuNum,
 					channel: this.getCartChannel(),
 					tableInfo: this.tableInfo,
+					memberProfile: snapshot,
 					sessionId: this.cartSessionId,
 					restaurantName: this.restaurantName
 				}
@@ -1038,7 +1177,7 @@
 						keyword,
 						restaurantId: this.restaurantId
 					})
-					this.searchResults = res.list || []
+					this.searchResults = (res.list || []).map(item => this.decorateDish(item))
 					if (!fromStorage && !this.searchResults.length) {
 						this.$u.toast('没有搜索到相关菜品')
 					}
@@ -1064,12 +1203,13 @@
 			},
 			selectSpec(dish) {
 				if (!dish) return
-				const defaultSkuId = this.getDefaultSkuId(dish)
+				const decorate = this.decorateDish(dish)
+				const defaultSkuId = this.getDefaultSkuId(decorate)
 				this.specPopup = {
 					show: true,
-					dish,
+					dish: decorate,
 					selectedSkuId: defaultSkuId,
-					selectedOptions: this.initOptionSelections(dish),
+					selectedOptions: this.initOptionSelections(decorate),
 					quantity: 1
 				}
 			},
@@ -1159,7 +1299,7 @@
 				return result
 			},
 			confirmSpecSelection() {
-				const dish = this.specPopup.dish
+				const dish = this.decorateDish(this.specPopup.dish)
 				const sku = this.findSkuById(dish, this.specPopup.selectedSkuId)
 				const options = this.getSelectedOptionsList()
 				if (!dish || !sku) return

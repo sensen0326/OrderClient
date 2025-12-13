@@ -1,0 +1,20 @@
+[
+  {
+    "title": "订单管理",
+    "icon": "order",
+    "children": [
+      {
+        "title": "订单中心",
+        "path": "/pages/order/list",
+        "icon": "order",
+        "permission": "order:list",
+        "actions": [
+          "view",
+          "update",
+          "remind",
+          "pushKitchen"
+        ]
+      }
+    ]
+  }
+]

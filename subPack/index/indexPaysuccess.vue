@@ -38,11 +38,11 @@
 			checkOrder() {
 				if (this.orderNo) {
 					uni.navigateTo({
-						url: `/subPack/order/orderDetail?orderNo=${this.orderNo}`
+						url: `/pages/order/detail?orderNo=${this.orderNo}`
 					})
 				} else {
 					uni.navigateTo({
-						url: "/pages/order/order"
+						url: "/pages/order/list"
 					})
 				}
 			}

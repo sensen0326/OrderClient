@@ -1,13 +1,36 @@
 'use strict'
 
-const db = uniCloud.database()\nconst dbCmd = db.command
+const db = uniCloud.database()
+const dbCmd = db.command
 const CART_COLLECTION = 'cart_sessions'
 const TABLE_SESSION_COLLECTION = 'table_session'
+const CDN_BASE_URL = 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage'
+const DEFAULT_DISH_IMAGE = `${CDN_BASE_URL}/static/menu/index-dining.png`
+const HTTP_URL_REG = /^https?:\/\//i
 
 function ensureString(val) {
   if (typeof val === 'string') return val
   if (val === undefined || val === null) return ''
   return String(val)
+}
+
+function resolveMediaUrl(url = '') {
+  if (!url) return ''
+  if (HTTP_URL_REG.test(url)) return url
+  if (url.startsWith('/')) {
+    return `${CDN_BASE_URL}${url}`
+  }
+  return `${CDN_BASE_URL}/${url.replace(/^\/+/, '')}`
+}
+
+function ensureDishImage(...sources) {
+  for (const src of sources) {
+    if (src) {
+      const resolved = resolveMediaUrl(src)
+      if (resolved) return resolved
+    }
+  }
+  return DEFAULT_DISH_IMAGE
 }
 
 function roundToTwo(num) {
@@ -24,7 +47,11 @@ function normalizeItems(items = []) {
         key: item.key || `${item.dishId || ''}_${item.skuId || ''}_${item.optionsText || ''}`,
         dishId: ensureString(item.dishId || item.dish_id),
         dishName: ensureString(item.dishName || item.dish_name || item.name),
-        dishImg: ensureString(item.dishImg || item.dish_img || item.icon || item.cover),
+        dishImg: ensureDishImage(
+          ensureString(item.dishImg || item.dish_img || item.icon || item.cover),
+          ensureString(item.cover),
+          ensureString(item.icon)
+        ),
         skuId: ensureString(item.skuId || item.sku_id),
         skuName: ensureString(item.skuName || item.sku_name),
         quantity,
@@ -106,8 +133,7 @@ function mergeMeta(base = {}, incoming = {}) {
   return Object.assign({}, base || {}, incoming || {})
 }
 
-module.exports = {
-  async preview(payload = {}) {
+async function doPreview(payload = {}) {
     const sessionId = ensureString(payload.sessionId || payload.session_id || 'local')
     const cart = await loadCart(sessionId)
     const itemsSource = Array.isArray(payload.items) && payload.items.length ? payload.items : cart && cart.items
@@ -136,6 +162,17 @@ module.exports = {
     const remark = payload.remark !== undefined ? payload.remark : (cart && cart.remark) || ''
     const meta = mergeMeta(cart && cart.meta, payload.meta)
     const peopleCount = resolvePeopleCount(payload, cart, tableInfo)
+    const memberSnapshot =
+      payload.memberProfile ||
+      (meta && meta.memberProfile) ||
+      (cart && cart.meta && cart.meta.memberProfile) ||
+      null
+    const memberId =
+      payload.memberId ||
+      (memberSnapshot && memberSnapshot.userId) ||
+      (meta && meta.memberId) ||
+      (cart && cart.meta && cart.meta.memberId) ||
+      ''
     return {
       sessionId,
       channel,
@@ -150,12 +187,23 @@ module.exports = {
       address: payload.address || null,
       invoice: payload.invoice || {},
       meta,
-      utensilsCount: Number(payload.utensilsCount || 0)
+      utensilsCount: Number(payload.utensilsCount || 0),
+      memberProfile: memberSnapshot,
+      memberId
     }
-  },
-  async submit(payload = {}) {
-    const preview = await this.preview(payload)
+}
+
+async function submitOrder(payload = {}) {
+    const preview = await doPreview(payload)
     const orderObj = uniCloud.importObject('order')
+    const memberSnapshot =
+      payload.memberProfile || preview.memberProfile || (preview.meta && preview.meta.memberProfile) || null
+    const memberId =
+      payload.memberId ||
+      preview.memberId ||
+      (memberSnapshot && memberSnapshot.userId) ||
+      (preview.meta && preview.meta.memberId) ||
+      ''
     const orderPayload = {
       sessionId: preview.sessionId,
       restaurantId: preview.restaurantId,
@@ -174,7 +222,9 @@ module.exports = {
         payable: preview.feeDetail.payable
       },
       couponId: payload.couponId || payload.selectedCouponId || '',
-      meta: mergeMeta(preview.meta, payload.meta)
+      meta: mergeMeta(preview.meta, payload.meta),
+      memberId,
+      memberProfile: memberSnapshot
     }
     const orderRes = await orderObj.createFromCart(orderPayload)
     return {
@@ -182,5 +232,9 @@ module.exports = {
       order: orderRes.order,
       preview
     }
-  }
+}
+
+module.exports = {
+  preview: doPreview,
+  submit: submitOrder
 }

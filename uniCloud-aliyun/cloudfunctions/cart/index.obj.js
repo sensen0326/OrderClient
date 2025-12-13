@@ -3,6 +3,28 @@
 const db = uniCloud.database()
 const CART_COLLECTION = 'cart_sessions'
 const PARTICIPANT_TTL = 1000 * 60 * 30 // 30 minutes
+const CDN_BASE_URL = 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage'
+const DEFAULT_DISH_IMAGE = `${CDN_BASE_URL}/static/menu/index-dining.png`
+const HTTP_URL_REG = /^https?:\/\//i
+
+function resolveMediaUrl(url = '') {
+  if (!url) return ''
+  if (HTTP_URL_REG.test(url)) return url
+  if (url.startsWith('/')) {
+    return `${CDN_BASE_URL}${url}`
+  }
+  return `${CDN_BASE_URL}/${url.replace(/^\/+/, '')}`
+}
+
+function ensureDishImage(...sources) {
+  for (const src of sources) {
+    if (src) {
+      const resolved = resolveMediaUrl(src)
+      if (resolved) return resolved
+    }
+  }
+  return DEFAULT_DISH_IMAGE
+}
 
 function ensureString(val) {
   if (typeof val === 'string') return val
@@ -29,7 +51,11 @@ function normalizeItems(items = []) {
         key: buildItemKey(item),
         dishId: ensureString(item.dishId || item.dish_id),
         dishName: ensureString(item.dishName || item.dish_name || item.name),
-        dishImg: ensureString(item.dishImg || item.dish_img || item.icon || item.cover),
+        dishImg: ensureDishImage(
+          ensureString(item.dishImg || item.dish_img || item.icon || item.cover),
+          ensureString(item.cover),
+          ensureString(item.icon)
+        ),
         skuId: ensureString(item.skuId || item.sku_id),
         skuName: ensureString(item.skuName || item.sku_name),
         quantity,
@@ -132,7 +158,6 @@ async function ensureCart(sessionId, base = {}) {
   if (cart) return cart
   const now = Date.now()
   cart = {
-    _id: sessionId,
     session_id: sessionId,
     restaurant_id: base.restaurantId || base.restaurant_id || 'default',
     channel: base.channel || 'dine_in',
@@ -145,7 +170,9 @@ async function ensureCart(sessionId, base = {}) {
     created_at: now,
     updated_at: now
   }
-  await db.collection(CART_COLLECTION).doc(sessionId).set(cart)
+  const writeDoc = { ...cart }
+  delete writeDoc._id
+  await db.collection(CART_COLLECTION).doc(sessionId).set(writeDoc)
   return cart
 }
 
@@ -187,7 +214,6 @@ module.exports = {
     const nextMeta = mergeMeta(cart.meta || {}, payload.meta || {})
     const tableInfo = payload.tableInfo || cart.table_info || null
     const doc = {
-      _id: sessionId,
       session_id: sessionId,
       restaurant_id: baseInfo.restaurantId || cart.restaurant_id || 'default',
       channel: baseInfo.channel || cart.channel || 'dine_in',
@@ -200,7 +226,9 @@ module.exports = {
       updated_at: now,
       created_at: cart.created_at || now
     }
-    await db.collection(CART_COLLECTION).doc(sessionId).set(doc)
+    const writeDoc = { ...doc }
+    delete writeDoc._id
+    await db.collection(CART_COLLECTION).doc(sessionId).set(writeDoc)
     return {
       sessionId,
       updated_at: now,
