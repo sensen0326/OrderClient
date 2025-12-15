@@ -85,5 +85,42 @@ module.exports = {
 		return {
 			list: res.data || []
 		}
+	},
+	async saveArea(payload = {}) {
+		const doc = {
+			name: payload.name || '默认配送范围',
+			type: payload.type || 'circle',
+			config: payload.config || { radius: Number(payload.radius || 0) || 5 },
+			min_amount: Number(payload.min_amount ?? payload.minAmount ?? 0),
+			delivery_fee: Number(payload.delivery_fee ?? payload.deliveryFee ?? 0),
+			package_fee: Number(payload.package_fee ?? payload.packageFee ?? 0),
+			extra_rules: Array.isArray(payload.extra_rules || payload.extraRules) ? (payload.extra_rules || payload.extraRules).map(rule => ({
+				distance: Number(rule.distance || 0),
+				delivery_fee: Number(rule.delivery_fee ?? rule.fee ?? 0)
+			})) : [],
+			updated_at: Date.now()
+		}
+		if (doc.type === 'circle') {
+			const radius = Number(payload.radius ?? doc.config.radius ?? 0)
+			doc.config = Object.assign({}, doc.config, { radius: radius > 0 ? radius : 5 })
+		}
+		if (payload._id) {
+			await db.collection(AREA_COLLECTION).doc(payload._id).update(doc)
+			return { _id: payload._id }
+		}
+		const res = await db.collection(AREA_COLLECTION).add(Object.assign({}, doc, { created_at: Date.now() }))
+		return {
+			_id: res.id || res._id
+		}
+	},
+	async removeArea(params = {}) {
+		const id = params.id || params._id
+		if (!id) {
+			throw new Error('id is required')
+		}
+		await db.collection(AREA_COLLECTION).doc(id).remove()
+		return {
+			success: true
+		}
 	}
 }

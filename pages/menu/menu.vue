@@ -545,7 +545,8 @@
 				return this.specSelectedSku ? Number(this.specSelectedSku.price || 0) : 0
 			}
 		},
-		async onLoad() {
+		async onLoad(options) {
+			await this.ensureTableBinding(options || {})
 			await this.initCartSession()
 			await this.initMenuData()
 		},
@@ -555,7 +556,8 @@
 				this.cartSyncTimer = null
 			}
 		},
-		onShow() {
+		async onShow() {
+			await this.ensureTableBinding()
 			this.subCurrent = uni.getStorageSync('subCurrent') || 0
 			const latestTable = tableService.getLocal()
 			if (latestTable) {
@@ -588,6 +590,98 @@
 			}
 		},
 		methods: {
+			async ensureTableBinding(options = {}) {
+				const localTable = tableService.getLocal()
+				if (localTable) {
+					this.tableInfo = localTable
+				}
+				let tableFromQuery = options.table || options.tableNo || options.t || ''
+				const scene = options.scene ? decodeURIComponent(options.scene) : ''
+				if (scene) {
+					const pairs = scene.split('&')
+					pairs.forEach(part => {
+						const [key, value] = part.split('=')
+						if (key && value && ['table', 'tableNo', 't'].includes(key)) {
+							tableFromQuery = value
+						}
+					})
+					if (!tableFromQuery && scene.toLowerCase().startsWith('table')) {
+						tableFromQuery = scene.replace(/^table/gi, '')
+					}
+				}
+				if (!tableFromQuery && typeof uni !== 'undefined' && typeof uni.getLaunchOptionsSync === 'function') {
+					const launchOptions = uni.getLaunchOptionsSync() || {}
+					const launchQuery = launchOptions.query || {}
+					tableFromQuery = launchQuery.table || launchQuery.tableNo || launchQuery.t || tableFromQuery || ''
+					if (!tableFromQuery && launchOptions.scene) {
+						const launchScene = decodeURIComponent(String(launchOptions.scene))
+						if (launchScene.toLowerCase().startsWith('table')) {
+							tableFromQuery = launchScene.replace(/^table/gi, '')
+						} else {
+							const launchPairs = launchScene.split('&')
+							launchPairs.forEach(part => {
+								const [key, value] = part.split('=')
+								if (key && value && ['table', 'tableNo', 't'].includes(key)) {
+									tableFromQuery = value
+								}
+							})
+						}
+					}
+				}
+				const storedTableNo = tableFromQuery || uni.getStorageSync('tableNo') || (localTable && localTable.tableNo) || ''
+				if (!storedTableNo) {
+					return
+				}
+				const cachedPeople = Number(uni.getStorageSync('peopleCount') || this.tableInfo?.peopleCount || 2)
+				const needForceOpen = !!tableFromQuery || !localTable || !localTable.sessionId || (localTable && localTable.tableNo !== storedTableNo)
+				if (needForceOpen) {
+					try {
+						const res = await tableService.open({
+							tableNo: storedTableNo,
+							peopleCount: cachedPeople
+						})
+						if (res && res.tableInfo) {
+							this.tableInfo = res.tableInfo
+							uni.setStorageSync('tableNo', storedTableNo)
+							return
+						}
+					} catch (err) {
+						console.warn('menu: auto bind table failed', err)
+					}
+				}
+				if (!this.tableInfo || this.tableInfo.tableNo !== storedTableNo || !this.tableInfo.sessionId) {
+					try {
+						const refreshed = await tableService.status({
+							tableNo: storedTableNo
+						})
+						if (refreshed && refreshed.table) {
+							this.tableInfo = refreshed.table
+						}
+					} catch (err) {
+						console.warn('menu: refresh table status failed', err)
+					}
+				}
+				if (!this.tableInfo) {
+					this.tableInfo = {
+						tableNo: storedTableNo,
+						status: 'idle',
+						peopleCount: cachedPeople
+					}
+				} else if (!this.tableInfo.sessionId) {
+					try {
+						const reopen = await tableService.open({
+							tableNo: storedTableNo,
+							peopleCount: cachedPeople
+						})
+						if (reopen && reopen.tableInfo) {
+							this.tableInfo = reopen.tableInfo
+							uni.setStorageSync('tableNo', storedTableNo)
+						}
+					} catch (err) {
+						console.warn('menu: reopen table session failed', err)
+					}
+				}
+			},
 			decorateCategory(raw) {
 				if (!raw) return raw
 				return {
@@ -769,14 +863,54 @@
 					this.$u.toast('请先在首页扫码绑定桌号')
 					return
 				}
-				try {
+				const ensureSessionAndCall = async (retry = false) => {
+					if (!this.tableInfo.sessionId || retry) {
+						await this.ensureTableBinding({ table: this.tableInfo.tableNo })
+					}
+					if (!this.tableInfo.sessionId) {
+						try {
+							const reopen = await tableService.open({
+								tableNo: this.tableInfo.tableNo,
+								peopleCount: this.tableInfo.peopleCount || Number(uni.getStorageSync('peopleCount') || 2)
+							})
+							if (reopen && reopen.tableInfo) {
+								this.tableInfo = reopen.tableInfo
+							}
+						} catch (openErr) {
+							console.warn('call waiter: open session failed', openErr)
+						}
+					}
+					if (!this.tableInfo.sessionId) {
+						return false
+					}
 					await tableService.callService({
 						tableNo: this.tableInfo.tableNo,
 						sessionId: this.tableInfo.sessionId,
 						type: 'waiter'
 					})
+					return true
+				}
+				try {
+					const success = await ensureSessionAndCall(false)
+					if (!success) {
+						this.$u.toast('桌号信息已失效，请重新扫码')
+						return
+					}
 					this.$u.toast('服务员已收到请求')
 				} catch (err) {
+					if (err && err.message && err.message.indexOf('table has no active session') !== -1) {
+						try {
+							const success = await ensureSessionAndCall(true)
+							if (success) {
+								this.$u.toast('服务员已收到请求')
+								return
+							}
+						} catch (retryErr) {
+							console.warn('call waiter retry failed', retryErr)
+							this.$u.toast(retryErr.message || '呼叫失败')
+							return
+						}
+					}
 					console.warn('call waiter failed', err)
 					this.$u.toast(err.message || '呼叫失败')
 				}

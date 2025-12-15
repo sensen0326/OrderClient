@@ -141,5 +141,102 @@ module.exports = {
 		return {
 			list
 		}
+	},
+	async adminListTemplates(params = {}) {
+		const page = Math.max(1, Number(params.page) || 1)
+		const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20))
+		const where = {}
+		if (params.status) where.status = params.status
+		const keyword = (params.keyword || '').trim()
+		if (keyword) {
+			const reg = new RegExp(keyword, 'i')
+			where.title = reg
+		}
+		const collection = db.collection(TEMPLATE_COLLECTION)
+		const countRes = await collection.where(where).count()
+		const res = await collection
+			.where(where)
+			.orderBy('created_at', 'desc')
+			.skip((page - 1) * pageSize)
+			.limit(pageSize)
+			.get()
+		return {
+			list: res.data || [],
+			pagination: {
+				page,
+				pageSize,
+				total: countRes.total || 0
+			}
+		}
+	},
+	async adminSaveTemplate(payload = {}) {
+		if (!payload.title) throw new Error('title is required')
+		const now = Date.now()
+		const doc = {
+			title: payload.title,
+			amount: Number(payload.amount || 0),
+			threshold: Number(payload.threshold || 0),
+			channel_limit: payload.channel_limit || 'all',
+			status: payload.status || 'active',
+			total: Number(payload.total || 0),
+			valid_start: Number(payload.valid_start || now),
+			valid_end: Number(payload.valid_end || now + 30 * 24 * 3600 * 1000),
+			description: payload.description || '',
+			updated_at: now
+		}
+		if (payload._id) {
+			await db.collection(TEMPLATE_COLLECTION).doc(payload._id).update(doc)
+		} else {
+			doc.created_at = now
+			doc.claimed = 0
+			await db.collection(TEMPLATE_COLLECTION).add(doc)
+		}
+		return { success: true }
+	},
+	async adminToggleTemplate(payload = {}) {
+		if (!payload.id) throw new Error('id is required')
+		if (!payload.status) throw new Error('status is required')
+		await db.collection(TEMPLATE_COLLECTION).doc(payload.id).update({
+			status: payload.status,
+			updated_at: Date.now()
+		})
+		return { success: true }
+	},
+	async adminDeleteTemplate(payload = {}) {
+		if (!payload.id) throw new Error('id is required')
+		await db.collection(TEMPLATE_COLLECTION).doc(payload.id).remove()
+		return { success: true }
+	},
+	async adminIssueCoupon(payload = {}) {
+		if (!payload.templateId) throw new Error('templateId is required')
+		const userIds = Array.isArray(payload.userIds) ? payload.userIds : []
+		if (!userIds.length) throw new Error('userIds is required')
+		const tplRes = await db.collection(TEMPLATE_COLLECTION).doc(payload.templateId).get()
+		if (!tplRes.data || !tplRes.data.length) throw new Error('模板不存在')
+		const template = tplRes.data[0]
+		const now = Date.now()
+		const ops = userIds.map(userId => {
+			const doc = {
+				template_id: payload.templateId,
+				user_id: userId,
+				title: template.title,
+				amount: template.amount,
+				threshold: template.threshold,
+				channel_limit: template.channel_limit || 'all',
+				status: 'unused',
+				valid_start: template.valid_start,
+				valid_end: template.valid_end,
+				source: 'manual',
+				created_at: now,
+				updated_at: now
+			}
+			return db.collection(COUPON_COLLECTION).add(doc)
+		})
+		await Promise.all(ops)
+		await db.collection(TEMPLATE_COLLECTION).doc(template._id).update({
+			claimed: dbCmd.inc(userIds.length),
+			updated_at: now
+		})
+		return { success: true }
 	}
 }

@@ -11,17 +11,12 @@ const POINT_RULE_COLLECTION = 'point_rule'
 const POINT_ORDER_COLLECTION = 'point_order'
 
 const DEFAULT_AVATAR_URL = 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/my/avatarurl.jpg'
-const DEFAULT_NICKNAME_PREFIX = '微信用户'
+const DEFAULT_NICKNAME_PREFIX = 'Guest'
 
 const DEFAULT_LEVELS = [
-	{ level: 1, name: 'V1', require_points: 0, benefits: ['生日礼', '基础积分'] },
-	{ level: 2, name: 'V2', require_points: 200, benefits: ['95 折', '优先排队'] },
+	{ level: 1, name: 'V1', require_points: 0, benefits: ['欢迎礼', '基础积分'] },
+	{ level: 2, name: 'V2', require_points: 200, benefits: ['95折', '优先排队'] },
 	{ level: 3, name: 'V3', require_points: 600, benefits: ['免配送费', '专属客服'] }
-]
-
-const DEFAULT_GOODS = [
-	{ name: '精品茶歇券', cost_points: 300, stock: 99, cover: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/points/goods-tea.jpg', desc: '堂食茶歇一份', status: 'on' },
-	{ name: '20 元抵扣券', cost_points: 500, stock: 50, cover: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/points/goods-coupon.jpg', desc: '全场通用抵扣', status: 'on' }
 ]
 
 const DEFAULT_POINT_RULES = [
@@ -33,8 +28,8 @@ const DEFAULT_POINT_RULES = [
 		change_direction: 'increase',
 		limit: 1,
 		limit_period: 'day',
-		limit_tip: '今日已签到',
-		description: '每天首次签到可得 10 积分',
+		limit_tip: '今日签到奖励已达上限',
+		description: '每天首次签到可得10积分',
 		status: 'active'
 	},
 	{
@@ -43,7 +38,7 @@ const DEFAULT_POINT_RULES = [
 		calc_type: 'ratio',
 		ratio: 1,
 		change_direction: 'increase',
-		description: '支付金额 1 元 = 1 积分，结果向下取整',
+		description: '支付金额1元=1积分，结果向下取整',
 		status: 'active'
 	},
 	{
@@ -55,7 +50,7 @@ const DEFAULT_POINT_RULES = [
 		limit: 3,
 		limit_period: 'day',
 		limit_tip: '今日评价奖励已达上限',
-		description: '每天前 3 条评价可获得 20 积分',
+		description: '每天前3条评价可获得20积分',
 		status: 'active'
 	},
 	{
@@ -67,62 +62,93 @@ const DEFAULT_POINT_RULES = [
 		limit: 10,
 		limit_period: 'total',
 		limit_tip: '邀请奖励已达上限',
-		description: '成功邀请好友注册可得 50 积分，每人限 10 次',
+		description: '成功邀请好友注册可得50积分，每人限10次',
 		status: 'active'
+	}
+]
+
+const DEFAULT_GOODS = [
+	{
+		name: '精品茶歇',
+		cost_points: 300,
+		stock: 99,
+		cover: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/points/goods-tea.jpg',
+		desc: '门店茶歇兑换券',
+		status: 'on'
+	},
+	{
+		name: '20元抵扣券',
+		cost_points: 500,
+		stock: 50,
+		cover: 'https://mp-a83aee34-7c6d-40e3-a241-85ab45b7ff6e.cdn.bspapp.com/cloudstorage/static/points/goods-coupon.jpg',
+		desc: '全场可用抵扣券',
+		status: 'on'
 	}
 ]
 
 let levelCache = null
 let pointRuleCache = null
 
+function resetLevelCache() {
+	levelCache = null
+}
+
+function resetPointRuleCache() {
+	pointRuleCache = null
+}
+
 async function ensureLevelRules() {
 	if (levelCache) return levelCache
 	const countRes = await db.collection(LEVEL_COLLECTION).count()
 	if (!countRes.total) {
 		const now = Date.now()
-		await db.collection(LEVEL_COLLECTION).add(DEFAULT_LEVELS.map(item => ({
-			...item,
-			created_at: now,
-			updated_at: now
-		})))
+		await db.collection(LEVEL_COLLECTION).add(
+			DEFAULT_LEVELS.map(item => ({
+				...item,
+				created_at: now,
+				updated_at: now
+			}))
+		)
 	}
 	const res = await db.collection(LEVEL_COLLECTION).orderBy('level', 'asc').get()
 	levelCache = res.data || DEFAULT_LEVELS
 	return levelCache
 }
 
-async function ensurePointGoods() {
-	const countRes = await db.collection(GOODS_COLLECTION).count()
-	if (!countRes.total) {
-		const now = Date.now()
-		await db.collection(GOODS_COLLECTION).add(DEFAULT_GOODS.map(item => ({
-			...item,
-			created_at: now,
-			updated_at: now
-		})))
-	}
-
 async function ensurePointRules() {
 	if (pointRuleCache) return pointRuleCache
 	const countRes = await db.collection(POINT_RULE_COLLECTION).count()
 	if (!countRes.total) {
 		const now = Date.now()
-		await db.collection(POINT_RULE_COLLECTION).add(DEFAULT_POINT_RULES.map(item => ({
-			...item,
-			created_at: now,
-			updated_at: now
-		})))
+		await db.collection(POINT_RULE_COLLECTION).add(
+			DEFAULT_POINT_RULES.map(item => ({
+				...item,
+				created_at: now,
+				updated_at: now
+			}))
+		)
 	}
-	const ruleRes = await db.collection(POINT_RULE_COLLECTION).get()
-	pointRuleCache = ruleRes.data || DEFAULT_POINT_RULES
+	const res = await db.collection(POINT_RULE_COLLECTION).get()
+	pointRuleCache = res.data || DEFAULT_POINT_RULES
 	return pointRuleCache
 }
+
+async function ensurePointGoods() {
+	const countRes = await db.collection(GOODS_COLLECTION).count()
+	if (!countRes.total) {
+		const now = Date.now()
+		await db.collection(GOODS_COLLECTION).add(
+			DEFAULT_GOODS.map(item => ({
+				...item,
+				created_at: now,
+				updated_at: now
+			}))
+		)
+	}
 }
 
 async function getUserById(userId) {
-	if (!userId) {
-		throw new Error('userId is required')
-	}
+	if (!userId) throw new Error('userId is required')
 	const res = await db.collection(USER_COLLECTION).doc(userId).get()
 	if (!res.data || !res.data.length) {
 		throw new Error('user not found')
@@ -154,7 +180,7 @@ async function attachLevelInfo(profile) {
 	const sorted = levels.slice().sort((a, b) => a.level - b.level)
 	let current = sorted[0]
 	for (const rule of sorted) {
-		if ((profile.points || 0) >= rule.require_points) {
+		if ((profile.points || 0) >= Number(rule.require_points || 0)) {
 			current = rule
 		}
 	}
@@ -163,13 +189,13 @@ async function attachLevelInfo(profile) {
 	profile.level_name = current.name
 	profile.level_benefits = current.benefits || []
 	if (nextRule) {
-		const progressBase = current.require_points
-		const progressTarget = nextRule.require_points
-		const currentPoints = profile.points || 0
-		const percent = ((currentPoints - progressBase) / (progressTarget - progressBase)) * 100
-		profile.level_progress = Math.min(100, Math.max(0, Number(percent.toFixed(2))))
+		const base = Number(current.require_points || 0)
+		const target = Number(nextRule.require_points || 0)
+		const currentPoints = Number(profile.points || 0)
+		const percent = target === base ? 100 : ((currentPoints - base) / (target - base)) * 100
+		profile.level_progress = Math.max(0, Math.min(100, Number(percent.toFixed(2))))
 		profile.next_level_name = nextRule.name
-		profile.next_level_need = Math.max(0, progressTarget - currentPoints)
+		profile.next_level_need = Math.max(0, target - currentPoints)
 	} else {
 		profile.level_progress = 100
 		profile.next_level_name = 'MAX'
@@ -179,13 +205,10 @@ async function attachLevelInfo(profile) {
 }
 
 function normalizeProfile(doc) {
-	const profile = Object.assign({}, doc, {
-		userId: doc._id
-	})
-	return profile
+	return Object.assign({}, doc, { userId: doc._id })
 }
 
-async function getPointRule(event) {
+async function getPointRuleByEvent(event) {
 	const rules = await ensurePointRules()
 	return rules.find(rule => rule.event === event)
 }
@@ -240,7 +263,7 @@ function calcRulePoints(rule, payload = {}) {
 async function applyPointRuleInternal(payload = {}) {
 	if (!payload.userId) throw new Error('userId is required')
 	if (!payload.event) throw new Error('event is required')
-	const rule = await getPointRule(payload.event)
+	const rule = await getPointRuleByEvent(payload.event)
 	if (!rule || rule.status !== 'active') {
 		throw new Error('积分规则未启用')
 	}
@@ -264,20 +287,27 @@ async function applyPointRuleInternal(payload = {}) {
 
 function normalizePointOrder(doc) {
 	if (!doc) return null
-	return Object.assign({}, doc, {
-		orderId: doc._id
-	})
+	return Object.assign({}, doc, { orderId: doc._id })
 }
 
+function buildPagination(params = {}) {
+	const page = Math.max(1, Number(params.page) || 1)
+	const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20))
+	return { page, pageSize }
+}
+
+function mergeFilters(filters = []) {
+	if (!filters.length) return {}
+	if (filters.length === 1) return filters[0]
+	return dbCmd.and(filters)
+}
 
 module.exports = {
 	async login(payload = {}) {
 		await ensureLevelRules()
 		const seedNickname = payload.nickname || DEFAULT_NICKNAME_PREFIX
 		const openid = payload.openid || payload.unionid || payload.mobile || `guest_${seedNickname}_${Date.now()}`
-		let profileRes = await db.collection(USER_COLLECTION).where({
-			openid
-		}).limit(1).get()
+		let profileRes = await db.collection(USER_COLLECTION).where({ openid }).limit(1).get()
 		let profile
 		const now = Date.now()
 		let isNew = false
@@ -296,7 +326,6 @@ module.exports = {
 				updated_at: now,
 				last_login_at: now
 			}
-			console.log('[member.login] create profile', openid, nickname, DEFAULT_AVATAR_URL)
 			const addRes = await db.collection(USER_COLLECTION).add(doc)
 			profile = Object.assign({}, doc, { _id: addRes.id || addRes._id })
 			isNew = true
@@ -309,9 +338,7 @@ module.exports = {
 			profile.last_login_at = now
 		}
 		const token = `tk_${profile._id}_${Date.now()}`
-		await db.collection(USER_COLLECTION).doc(profile._id).update({
-			token
-		})
+		await db.collection(USER_COLLECTION).doc(profile._id).update({ token })
 		const decorated = await attachLevelInfo(normalizeProfile(profile))
 		return {
 			token,
@@ -326,50 +353,36 @@ module.exports = {
 			profile: await attachLevelInfo(normalizeProfile(user))
 		}
 	},
-async signIn(payload = {}) {
-	if (!payload.userId) {
-		throw new Error('userId is required')
-	}
-	const result = await applyPointRuleInternal({
-		userId: payload.userId,
-		event: 'daily_sign',
-		remark: '每日签到'
-	})
-	const user = await getUserById(payload.userId)
-	user.points = result.balance
-	return {
-		points: result.balance,
-		profile: await attachLevelInfo(normalizeProfile(user))
-	}
-},
+	async signIn(payload = {}) {
+		if (!payload.userId) throw new Error('userId is required')
+		const result = await applyPointRuleInternal({
+			userId: payload.userId,
+			event: 'daily_sign',
+			remark: '每日签到'
+		})
+		const user = await getUserById(payload.userId)
+		user.points = result.balance
+		return {
+			points: result.balance,
+			profile: await attachLevelInfo(normalizeProfile(user))
+		}
+	},
 	async listPointGoods() {
 		await ensurePointGoods()
-		const res = await db.collection(GOODS_COLLECTION).where({
-			status: 'on'
-		}).get()
-		return {
-			list: res.data || []
-		}
+		const res = await db.collection(GOODS_COLLECTION).where({ status: 'on' }).orderBy('created_at', 'desc').get()
+		return { list: res.data || [] }
 	},
 	async exchangeGoods(payload = {}) {
 		if (!payload.userId || !payload.goodsId) {
 			throw new Error('userId and goodsId are required')
 		}
 		const goodsRes = await db.collection(GOODS_COLLECTION).doc(payload.goodsId).get()
-		if (!goodsRes.data || !goodsRes.data.length) {
-			throw new Error('商品不存在')
-		}
+		if (!goodsRes.data || !goodsRes.data.length) throw new Error('商品不存在')
 		const goods = goodsRes.data[0]
-		if (goods.status !== 'on') {
-			throw new Error('商品已下架')
-		}
-		if (goods.stock <= 0) {
-			throw new Error('库存不足')
-		}
+		if (goods.status !== 'on') throw new Error('商品已下架')
+		if (goods.stock <= 0) throw new Error('库存不足')
 		const user = await getUserById(payload.userId)
-		if ((user.points || 0) < goods.cost_points) {
-			throw new Error('积分不足')
-		}
+		if ((user.points || 0) < goods.cost_points) throw new Error('积分不足')
 		await changePoints(payload.userId, -goods.cost_points, 'exchange_goods', goods.name)
 		await db.collection(GOODS_COLLECTION).doc(goods._id).update({
 			stock: dbCmd.inc(-1),
@@ -400,69 +413,232 @@ async signIn(payload = {}) {
 		}
 	},
 	async updateProfile(payload = {}) {
-		if (!payload.userId) {
-			throw new Error('userId is required')
-		}
-		const doc = await getUserById(payload.userId)
-		const updateData = {
-			updated_at: Date.now()
-		}
-		if (payload.nickname) {
-			updateData.nickname = payload.nickname
-		}
-		if (payload.avatar) {
-			updateData.avatar = payload.avatar
-		}
-		await db.collection(USER_COLLECTION).doc(doc._id).update(updateData)
+		if (!payload.userId) throw new Error('userId is required')
+		const updateData = { updated_at: Date.now() }
+		if (payload.nickname) updateData.nickname = payload.nickname
+		if (payload.avatar) updateData.avatar = payload.avatar
+		if (payload.mobile) updateData.mobile = payload.mobile
+		await db.collection(USER_COLLECTION).doc(payload.userId).update(updateData)
 		const refreshed = await getUserById(payload.userId)
 		return {
 			profile: await attachLevelInfo(normalizeProfile(refreshed))
 		}
 	},
 	async pointLedger(payload = {}) {
-		if (!payload.userId) {
-			throw new Error('userId is required')
-		}
-		const pageSize = Math.min(50, Math.max(1, Number(payload.limit || 20)))
+		if (!payload.userId) throw new Error('userId is required')
+		const limit = Math.min(50, Math.max(1, Number(payload.limit || 20)))
 		const res = await db.collection(LEDGER_COLLECTION)
-			.where({
-				user_id: payload.userId
-			})
+			.where({ user_id: payload.userId })
 			.orderBy('created_at', 'desc')
-			.limit(pageSize)
+			.limit(limit)
 			.get()
-		return {
-			list: res.data || []
-		}
+		return { list: res.data || [] }
 	},
 	async pointOrders(payload = {}) {
-		if (!payload.userId) {
-			throw new Error('userId is required')
-		}
+		if (!payload.userId) throw new Error('userId is required')
+		const limit = Math.min(50, Math.max(1, Number(payload.limit || 10)))
 		const res = await db.collection(POINT_ORDER_COLLECTION)
-			.where({
-				user_id: payload.userId
-			})
+			.where({ user_id: payload.userId })
 			.orderBy('created_at', 'desc')
-			.limit(Math.min(50, Math.max(1, Number(payload.limit || 10))))
+			.limit(limit)
 			.get()
-		return {
-			list: (res.data || []).map(normalizePointOrder)
-		}
+		return { list: (res.data || []).map(normalizePointOrder) }
 	},
 	async levelRules() {
 		const list = await ensureLevelRules()
-		return {
-			list
-		}
+		return { list }
 	},
 	async pointRules() {
 		const list = await ensurePointRules()
-		return {
-			list
-		}
+		return { list }
 	},
 	async applyPointRule(payload = {}) {
 		return applyPointRuleInternal(payload)
+	},
+
+	/* ===== 后台管理 ===== */
+	async adminListProfiles(params = {}) {
+		const { page, pageSize } = buildPagination(params)
+		const filters = []
+		const keyword = (params.keyword || '').trim()
+		if (keyword) {
+			const reg = new RegExp(keyword, 'i')
+			filters.push(dbCmd.or([{ nickname: reg }, { mobile: reg }, { openid: reg }]))
+		}
+		if (params.level) {
+			filters.push({ level: Number(params.level) })
+		}
+		const where = mergeFilters(filters)
+		const collection = db.collection(USER_COLLECTION)
+		const countRes = await collection.where(where).count()
+		const res = await collection
+			.where(where)
+			.orderBy('created_at', 'desc')
+			.skip((page - 1) * pageSize)
+			.limit(pageSize)
+			.get()
+		const list = await Promise.all((res.data || []).map(async item => attachLevelInfo(normalizeProfile(item))))
+		return {
+			list,
+			pagination: {
+				page,
+				pageSize,
+				total: countRes.total || 0
+			}
+		}
+	},
+	async adminAdjustPoints(payload = {}) {
+		if (!payload.userId) throw new Error('userId is required')
+		const change = Number(payload.change || 0)
+		if (!change) throw new Error('change is required')
+		const balance = await changePoints(payload.userId, change, 'manual_adjust', payload.remark || '后台调整')
+		const profile = await attachLevelInfo(normalizeProfile(await getUserById(payload.userId)))
+		return { balance, profile }
+	},
+	async adminPointLedger(payload = {}) {
+		if (!payload.userId) throw new Error('userId is required')
+		const { page, pageSize } = buildPagination(payload)
+		const res = await db.collection(LEDGER_COLLECTION)
+			.where({ user_id: payload.userId })
+			.orderBy('created_at', 'desc')
+			.skip((page - 1) * pageSize)
+			.limit(pageSize)
+			.get()
+		return { list: res.data || [] }
+	},
+	async adminSaveLevelRules(payload = {}) {
+		const rules = Array.isArray(payload.rules) ? payload.rules : []
+		if (!rules.length) throw new Error('rules is required')
+		await db.collection(LEVEL_COLLECTION).where({}).remove()
+		const now = Date.now()
+		await db.collection(LEVEL_COLLECTION).add(
+			rules.map(rule => ({
+				level: Number(rule.level),
+				name: rule.name || `V${rule.level}`,
+				require_points: Number(rule.require_points || 0),
+				benefits: rule.benefits || [],
+				created_at: now,
+				updated_at: now
+			}))
+		)
+		resetLevelCache()
+		return { success: true }
+	},
+	async adminSavePointRule(payload = {}) {
+		const rule = payload.rule || {}
+		if (!rule.event) throw new Error('event is required')
+		const now = Date.now()
+		const doc = {
+			event: rule.event,
+			name: rule.name || rule.event,
+			calc_type: rule.calc_type || 'fixed',
+			value: Number(rule.value || 0),
+			ratio: Number(rule.ratio || 0),
+			change_direction: rule.change_direction || 'increase',
+			limit: Number(rule.limit || 0),
+			limit_period: rule.limit_period || 'day',
+			limit_tip: rule.limit_tip || '',
+			description: rule.description || '',
+			status: rule.status || 'active',
+			max_points: Number(rule.max_points || 0),
+			updated_at: now
+		}
+		if (rule._id) {
+			await db.collection(POINT_RULE_COLLECTION).doc(rule._id).update(doc)
+		} else {
+			doc.created_at = now
+			await db.collection(POINT_RULE_COLLECTION).add(doc)
+		}
+		resetPointRuleCache()
+		return { success: true }
+	},
+	async adminDeletePointRule(payload = {}) {
+		if (!payload.id) throw new Error('id is required')
+		await db.collection(POINT_RULE_COLLECTION).doc(payload.id).remove()
+		resetPointRuleCache()
+		return { success: true }
+	},
+	async adminListPointGoods(payload = {}) {
+		await ensurePointGoods()
+		const { page, pageSize } = buildPagination(payload)
+		const where = {}
+		if (payload.status) where.status = payload.status
+		const collection = db.collection(GOODS_COLLECTION)
+		const countRes = await collection.where(where).count()
+		const res = await collection
+			.where(where)
+			.orderBy('created_at', 'desc')
+			.skip((page - 1) * pageSize)
+			.limit(pageSize)
+			.get()
+		return {
+			list: res.data || [],
+			pagination: {
+				page,
+				pageSize,
+				total: countRes.total || 0
+			}
+		}
+	},
+	async adminSavePointGoods(payload = {}) {
+		const now = Date.now()
+		const data = {
+			name: payload.name,
+			cost_points: Number(payload.cost_points || 0),
+			stock: Number(payload.stock || 0),
+			cover: payload.cover || '',
+			desc: payload.desc || '',
+			status: payload.status || 'on',
+			delivery_type: payload.delivery_type || 'self_pick',
+			updated_at: now
+		}
+		if (!data.name) throw new Error('name is required')
+		if (payload._id) {
+			await db.collection(GOODS_COLLECTION).doc(payload._id).update(data)
+		} else {
+			data.created_at = now
+			await db.collection(GOODS_COLLECTION).add(data)
+		}
+		return { success: true }
+	},
+	async adminDeletePointGoods(payload = {}) {
+		if (!payload.id) throw new Error('id is required')
+		await db.collection(GOODS_COLLECTION).doc(payload.id).remove()
+		return { success: true }
+	},
+	async adminListPointOrders(payload = {}) {
+		const { page, pageSize } = buildPagination(payload)
+		const where = {}
+		if (payload.status) where.status = payload.status
+		const collection = db.collection(POINT_ORDER_COLLECTION)
+		const countRes = await collection.where(where).count()
+		const res = await collection
+			.where(where)
+			.orderBy('created_at', 'desc')
+			.skip((page - 1) * pageSize)
+			.limit(pageSize)
+			.get()
+		return {
+			list: (res.data || []).map(normalizePointOrder),
+			pagination: {
+				page,
+				pageSize,
+				total: countRes.total || 0
+			}
+		}
+	},
+	async adminUpdatePointOrderStatus(payload = {}) {
+		if (!payload.orderId) throw new Error('orderId is required')
+		if (!payload.status) throw new Error('status is required')
+		const update = {
+			status: payload.status,
+			remark: payload.remark || '',
+			updated_at: Date.now()
+		}
+		if (payload.delivery_info) {
+			update.delivery_info = payload.delivery_info
+		}
+		await db.collection(POINT_ORDER_COLLECTION).doc(payload.orderId).update(update)
+		return { success: true }
 	}
 }

@@ -1,18 +1,59 @@
-const hasUniCloud = typeof uniCloud !== 'undefined' && uniCloud && typeof uniCloud.importObject === 'function'
 const hasUni = typeof uni !== 'undefined' && typeof uni.getStorageSync === 'function'
 
 const STORAGE_KEY = 'tableInfo'
 
 const getTableObject = (() => {
-	let instance = null
-	return () => {
-		if (!hasUniCloud) return null
-		if (!instance) {
-			instance = uniCloud.importObject('table', {
-				customUI: true
-			})
+	let objInstance = null
+	let callFnWrapper = null
+
+	function buildCallFunctionWrapper() {
+		if (typeof uniCloud === 'undefined' || !uniCloud || typeof uniCloud.callFunction !== 'function') {
+			return null
 		}
-		return instance
+		return {
+			async execute(method, params = {}) {
+				const res = await uniCloud.callFunction({
+					name: 'table',
+					data: {
+						method,
+						params: [params]
+					}
+				})
+				return res && res.result ? res.result : res
+			},
+			scanOpen(payload) {
+				return this.execute('scanOpen', payload)
+			},
+			status(payload) {
+				return this.execute('status', payload)
+			},
+			callService(payload) {
+				return this.execute('callService', payload)
+			},
+			release(payload) {
+				return this.execute('release', payload)
+			}
+		}
+	}
+
+	return () => {
+		if (typeof uniCloud === 'undefined' || !uniCloud) {
+			objInstance = null
+			callFnWrapper = null
+			return null
+		}
+		if (typeof uniCloud.importObject === 'function') {
+			if (!objInstance) {
+				objInstance = uniCloud.importObject('table', {
+					customUI: true
+				})
+			}
+			return objInstance
+		}
+		if (!callFnWrapper) {
+			callFnWrapper = buildCallFunctionWrapper()
+		}
+		return callFnWrapper
 	}
 })()
 
