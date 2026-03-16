@@ -1,6 +1,6 @@
 {
     "name" : "点餐小程序用户端",
-    "appid" : "wxbde48866849ac33d",
+    "appid" : "__WX_APP_ID__",
     "description" : "",
     "versionName" : "1.0.0",
     "versionCode" : "100",
@@ -42,7 +42,7 @@
     },
     "quickapp" : {},
     "mp-weixin" : {
-        "appid" : "wxbde48866849ac33d",
+        "appid" : "__WX_APP_ID__",
         "setting" : {
             "urlCheck" : false,
             "es6" : true,

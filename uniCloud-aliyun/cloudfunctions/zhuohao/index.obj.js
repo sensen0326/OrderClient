@@ -3,12 +3,18 @@
 const db = uniCloud.database()
 
 // 微信小程序配置，可直接改写或通过环境变量覆盖
-const WEAPP_APPID = process.env.WX_APP_ID || 'wxbde48866849ac33d'
-const WEAPP_SECRET = process.env.WX_APP_SECRET || '2838341a00de5cbd3a4e93ce0e574429'
+const sharedConfig = require('../shared/app.config.js')
+const weapp = sharedConfig && sharedConfig.weapp ? sharedConfig.weapp : {}
+
+const WEAPP_APPID = process.env.WX_APP_ID || weapp.appId || ''
+const WEAPP_SECRET = process.env.WX_APP_SECRET || weapp.appSecret || ''
 const QR_PAGE = 'pages/index/index'
 const ENV_VERSION = 'release'
 
 async function getAccessToken() {
+	if (!WEAPP_APPID || !WEAPP_SECRET) {
+		throw new Error('missing WeChat appId/appSecret, please set env or app.config.local.js')
+	}
 	const res = await uniCloud.httpclient.request('https://api.weixin.qq.com/cgi-bin/token', {
 		method: 'GET',
 		data: {

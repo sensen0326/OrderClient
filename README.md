@@ -133,6 +133,16 @@ node scripts/sync-weapp-config.js
 - 同步 `app.config.js` 到 `manifest.json`、`project.config.json`
 - 同步共享配置到 `uniCloud-aliyun/cloudfunctions/auth/shared` 与 `zhuohao/shared`
 
+### 本地私有配置（不提交到 Git）
+1. 复制文件：
+```bash
+cp uniCloud-aliyun/cloudfunctions/shared/app.config.local.example.js uniCloud-aliyun/cloudfunctions/shared/app.config.local.js
+```
+2. 在 `app.config.local.js` 中填入你自己的 `appId/appSecret`
+3. 执行 `node scripts/sync-weapp-config.js` 回填本地 `manifest.json/project.config.json` 供调试
+
+`app.config.local.js` 已加入 `.gitignore`，不会被提交。
+
 ### 关于 npm
 当前仓库只有 `package-lock.json`，没有 `package.json`。  
 如果你要走 CLI 构建，请先在 HBuilderX 中创建 `package.json` 或手动补齐脚本。
