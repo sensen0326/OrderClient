@@ -3,11 +3,11 @@
 const db = uniCloud.database()
 
 // 微信小程序配置，可直接改写或通过环境变量覆盖
-const sharedConfig = require('../shared/app.config.js')
+const sharedConfig = require('./shared/app.config.js')
 const weapp = sharedConfig && sharedConfig.weapp ? sharedConfig.weapp : {}
 
-const WEAPP_APPID = process.env.WX_APP_ID || weapp.appId || ''
-const WEAPP_SECRET = process.env.WX_APP_SECRET || weapp.appSecret || ''
+const WEAPP_APPID = weapp.appId || process.env.WX_APP_ID || ''
+const WEAPP_SECRET = weapp.appSecret || process.env.WX_APP_SECRET || ''
 const QR_PAGE = 'pages/index/index'
 const ENV_VERSION = 'release'
 

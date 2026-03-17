@@ -44,3 +44,4 @@ typings/
 
 # Local secrets (never commit)
 uniCloud-aliyun/cloudfunctions/shared/app.config.local.js
+uniCloud-aliyun/cloudfunctions/**/shared/app.config.local.js

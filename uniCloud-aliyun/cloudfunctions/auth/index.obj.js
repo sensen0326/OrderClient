@@ -15,12 +15,24 @@ const config = require('./config')
 const SESSION_GRACE_MS = 120 * 1000
 let accessTokenCache = {
 	token: '',
-	expiresAt: 0
+	expiresAt: 0,
+	appId: ''
+}
+
+function maskAppId(appId = '') {
+	if (!appId) return 'EMPTY'
+	if (appId.length <= 6) return appId
+	return `${appId.slice(0, 4)}***${appId.slice(-4)}`
 }
 
 function assertConfig() {
 	if (!config.appId || !config.appSecret) {
-		throw new Error('请先在 uniCloud-aliyun/cloudfunctions/auth/config.js 中配置 appId 与 appSecret')
+		const source = config.meta && config.meta.source ? config.meta.source : 'unknown'
+		throw new Error(`[auth] missing appId/appSecret (source: ${source})`)
+	}
+	if (!/^wx[a-zA-Z0-9]{16}$/.test(config.appId)) {
+		const source = config.meta && config.meta.source ? config.meta.source : 'unknown'
+		throw new Error(`[auth] invalid appId format: ${maskAppId(config.appId)} (source: ${source})`)
 	}
 }
 
@@ -50,17 +62,28 @@ async function requestWeixinAPI(url, {
 }
 
 async function getAccessToken() {
-	if (accessTokenCache.token && accessTokenCache.expiresAt > Date.now()) {
+	if (
+		accessTokenCache.token &&
+		accessTokenCache.expiresAt > Date.now() &&
+		accessTokenCache.appId === config.appId
+	) {
 		return accessTokenCache.token
 	}
-	const res = await requestWeixinAPI('https://api.weixin.qq.com/cgi-bin/token', {
-		appid: config.appId,
-		secret: config.appSecret,
-		grant_type: 'client_credential'
-	})
+	let res
+	try {
+		res = await requestWeixinAPI('https://api.weixin.qq.com/cgi-bin/token', {
+			appid: config.appId,
+			secret: config.appSecret,
+			grant_type: 'client_credential'
+		})
+	} catch (err) {
+		const source = config.meta && config.meta.source ? config.meta.source : 'unknown'
+		throw new Error(`[auth] getAccessToken failed, appId=${maskAppId(config.appId)}, source=${source}, reason=${err.message}`)
+	}
 	accessTokenCache = {
 		token: res.access_token,
-		expiresAt: Date.now() + (res.expires_in || 3600) * 1000 - 60000
+		expiresAt: Date.now() + (res.expires_in || 3600) * 1000 - 60000,
+		appId: config.appId
 	}
 	return accessTokenCache.token
 }
@@ -244,18 +267,49 @@ module.exports = {
 	},
 	async getPhoneNumber(payload = {}) {
 		const code = payload.code
+		const runtimeAppId = typeof payload.runtimeAppId === 'string' ? payload.runtimeAppId.trim() : ''
 		if (!code) {
 			throw new Error('code is required')
 		}
 		assertConfig()
-		const token = await getAccessToken()
-		const phoneRes = await requestWeixinAPI(`https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${token}`, {
-			method: 'POST',
-			contentType: 'json',
-			data: {
-				code
+		if (runtimeAppId && runtimeAppId !== config.appId) {
+			throw new Error(`[auth] runtime mini-program appid mismatch, runtime=${runtimeAppId}, server=${config.appId}`)
+		}
+		let token = await getAccessToken()
+		let phoneRes
+		try {
+			phoneRes = await requestWeixinAPI(`https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${token}`, {
+				method: 'POST',
+				contentType: 'json',
+				data: {
+					code
+				}
+			})
+		} catch (err) {
+			const msg = err && err.message ? err.message : ''
+			if (msg.includes('errcode: 40013') || msg.toLowerCase().includes('invalid appid')) {
+				// Force refresh token once to avoid stale token from previous appId config.
+				accessTokenCache = { token: '', expiresAt: 0, appId: '' }
+				token = await getAccessToken()
+				try {
+					phoneRes = await requestWeixinAPI(`https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${token}`, {
+						method: 'POST',
+						contentType: 'json',
+						data: {
+							code
+						}
+					})
+				} catch (retryErr) {
+					const source = config.meta && config.meta.source ? config.meta.source : 'unknown'
+					const retryMsg = retryErr && retryErr.message ? retryErr.message : 'unknown error'
+					throw new Error(
+						`[auth] getPhoneNumber failed after token refresh, runtime=${runtimeAppId || 'EMPTY'}, server=${config.appId}, source=${source}, reason=${retryMsg}`
+					)
+				}
+			} else {
+				throw err
 			}
-		})
+		}
 		const phoneNumber = phoneRes?.phone_info?.purePhoneNumber || ''
 		if (phoneNumber && payload.userId) {
 			await updateMobile(payload.userId, phoneNumber)

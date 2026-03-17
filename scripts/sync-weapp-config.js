@@ -4,10 +4,16 @@ const path = require('path')
 const rootDir = path.resolve(__dirname, '..')
 const appConfigPath = path.resolve(rootDir, 'app.config.js')
 const appConfig = require(appConfigPath)
+const dcloud = appConfig.dcloud || {}
 const weapp = appConfig.weapp || {}
 
 if (!weapp.appId) {
 	console.error('[sync-weapp-config] weapp.appId is empty in app.config.js')
+	process.exit(1)
+}
+
+if (!dcloud.appId) {
+	console.error('[sync-weapp-config] dcloud.appId is empty in app.config.js')
 	process.exit(1)
 }
 
@@ -25,15 +31,21 @@ function updateJson(fileRelativePath, updater) {
 }
 
 updateJson('manifest.json', (data) => {
+	const nextData = data
+	let changed = false
+	if (nextData.appid !== dcloud.appId) {
+		nextData.appid = dcloud.appId
+		changed = true
+	}
 	if (!data['mp-weixin']) {
-		data['mp-weixin'] = {}
+		nextData['mp-weixin'] = {}
 	}
-	const current = data['mp-weixin'].appid
+	const current = nextData['mp-weixin'].appid
 	if (current === weapp.appId) {
-		return { data, changed: false }
+		return { data: nextData, changed }
 	}
-	data['mp-weixin'].appid = weapp.appId
-	return { data, changed: true }
+	nextData['mp-weixin'].appid = weapp.appId
+	return { data: nextData, changed: true }
 })
 
 updateJson('project.config.json', (data) => {
@@ -43,25 +55,5 @@ updateJson('project.config.json', (data) => {
 	data.appid = weapp.appId
 	return { data, changed: true }
 })
-
-function copySharedConfig(targetDir) {
-	const src = path.resolve(rootDir, 'uniCloud-aliyun/cloudfunctions/shared/app.config.js')
-	const destDir = path.resolve(rootDir, targetDir, 'shared')
-	const dest = path.resolve(destDir, 'app.config.js')
-	fs.mkdirSync(destDir, { recursive: true })
-	const srcContent = fs.readFileSync(src, 'utf8')
-	if (fs.existsSync(dest)) {
-		const prev = fs.readFileSync(dest, 'utf8')
-		if (prev === srcContent) {
-			console.log(`[sync-weapp-config] ${dest} already synced`)
-			return
-		}
-	}
-	fs.writeFileSync(dest, srcContent)
-	console.log(`[sync-weapp-config] synced ${dest}`)
-}
-
-copySharedConfig('uniCloud-aliyun/cloudfunctions/auth')
-copySharedConfig('uniCloud-aliyun/cloudfunctions/zhuohao')
 
 console.log('[sync-weapp-config] done')

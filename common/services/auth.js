@@ -50,6 +50,18 @@ function isSessionValid(session) {
 	return session.expiresAt > Date.now()
 }
 
+function getRuntimeMiniProgramAppId() {
+	try {
+		if (typeof wx !== 'undefined' && wx && typeof wx.getAccountInfoSync === 'function') {
+			const info = wx.getAccountInfoSync()
+			return info && info.miniProgram ? info.miniProgram.appId || '' : ''
+		}
+	} catch (err) {
+		console.warn('getRuntimeMiniProgramAppId failed', err)
+	}
+	return ''
+}
+
 function requestLoginCode() {
 	return new Promise((resolve, reject) => {
 		const useUniLogin = hasUni && typeof uni.login === 'function'
@@ -153,7 +165,8 @@ async function bindPhoneNumber(code, userId) {
 	}
 	const res = await authObj.getPhoneNumber({
 		code,
-		userId
+		userId,
+		runtimeAppId: getRuntimeMiniProgramAppId()
 	})
 	return res
 }

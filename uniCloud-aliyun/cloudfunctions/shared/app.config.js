@@ -15,12 +15,16 @@ function loadLocalConfig() {
 }
 
 const localConfig = loadLocalConfig()
+const localDcloud = localConfig && localConfig.dcloud ? localConfig.dcloud : {}
 const localWeapp = localConfig && localConfig.weapp ? localConfig.weapp : {}
 
 module.exports = {
+	dcloud: {
+		appId: localDcloud.appId || process.env.UNI_APP_ID || ''
+	},
 	weapp: {
-		// Priority: env > local private config > empty placeholder
-		appId: process.env.WX_APP_ID || localWeapp.appId || '',
-		appSecret: process.env.WX_APP_SECRET || localWeapp.appSecret || ''
+		// Prefer local private config, fallback to cloud env for deployment-only setup.
+		appId: localWeapp.appId || process.env.WX_APP_ID || '',
+		appSecret: localWeapp.appSecret || process.env.WX_APP_SECRET || ''
 	}
 }

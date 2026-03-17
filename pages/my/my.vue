@@ -366,12 +366,15 @@ export default {
 				return
 			}
 			if (!e.detail || e.detail.errMsg !== 'getPhoneNumber:ok') {
-				this.$u.toast('未授权手机号')
+				const errMsg = e && e.detail && e.detail.errMsg ? e.detail.errMsg : '未授权手机号'
+				console.warn('getPhoneNumber rejected', e && e.detail ? e.detail : e)
+				this.$u.toast(errMsg)
 				return
 			}
 			const code = e.detail.code
 			if (!code) {
-				this.$u.toast('授权信息无效')
+				console.warn('getPhoneNumber missing code', e.detail)
+				this.$u.toast('授权信息无效：未拿到 code')
 				return
 			}
 			this.phoneAuthLoading = true
